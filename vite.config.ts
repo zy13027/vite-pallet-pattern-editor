@@ -1,31 +1,37 @@
 import { defineConfig } from "vite";
+import { nodePolyfills } from "vite-plugin-node-polyfills";
+import react from "@vitejs/plugin-react"; // <--- 1. IMPORT REACT PLUGIN
 
 export default defineConfig({
     base: "./",
+    plugins: [
+        react(), // <--- 2. ADD REACT PLUGIN HERE
+        // REQUIRED: Polyfills Node.js globals for the Siemens API library
+        nodePolyfills({
+            include: ['buffer', 'stream', 'util', 'process', 'events', 'path', 'url', 'http', 'https'],
+            globals: {
+                Buffer: true,
+                global: true,
+                process: true,
+            },
+        }),
+    ],
     build: {
-        // 1. Create the project folder inside dist
         outDir: "dist/pallet_layer_editor",
         emptyOutDir: true,
-
         target: "es2020",
         sourcemap: false,
-        cssCodeSplit: false, // Keeps CSS in one file
+        cssCodeSplit: false,
         assetsInlineLimit: 0,
-
         rollupOptions: {
             output: {
-                // 2. Force the JavaScript to be named 'main.js' in the root
                 entryFileNames: "main.js",
                 chunkFileNames: "[name].js",
-
-                // 3. Logic to separate CSS (root) from Images/SVG (assets folder)
                 assetFileNames: (assetInfo) => {
-                    // If the file is CSS, put it in the root as 'style.css'
+                    // Safe check for name property
                     if (assetInfo.name && assetInfo.name.endsWith('.css')) {
                         return 'style.css';
                     }
-
-                    // All other assets (like your SVG) go into the 'assets' folder
                     return 'assets/[name][extname]';
                 },
             },
@@ -33,5 +39,8 @@ export default defineConfig({
     },
     server: {
         host: true
+    },
+    optimizeDeps: {
+        include: ['@siemens/simatic-s7-webserver-api']
     }
 });
