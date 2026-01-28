@@ -1,24 +1,17 @@
+// Import your own global styles (if you have them)
 import './style.css'
-import javascriptLogo from './javascript.svg'
-import viteLogo from '/vite.svg'
-import { setupCounter } from './counter.js'
 
+// Import your Pallet Editor logic (you will create this file later)
+import { initPalletEditor } from './palletEditor.js'
+
+// Initialize your app inside the #app div
 document.querySelector('#app').innerHTML = `
-  <div>
-    <a href="https://vite.dev" target="_blank">
-      <img src="${viteLogo}" class="logo" alt="Vite logo" />
-    </a>
-    <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript" target="_blank">
-      <img src="${javascriptLogo}" class="logo vanilla" alt="JavaScript logo" />
-    </a>
-    <h1>Hello Vite!</h1>
-    <div class="card">
-      <button id="counter" type="button"></button>
-    </div>
-    <p class="read-the-docs">
-      Click on the Vite logo to learn more
-    </p>
+  <div class="editor-container">
+    <h1>Pallet Pattern Editor</h1>
+    <canvas id="palletCanvas"></canvas>
+    <div id="controls"></div>
   </div>
 `
 
-setupCounter(document.querySelector('#counter'))
+// Start your specific logic
+initPalletEditor(document.querySelector('#palletCanvas'))

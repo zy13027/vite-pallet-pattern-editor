@@ -1,69 +1,72 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta
-          name="viewport"
-          content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"
-  />
-  <title>Pallet Layer Editor</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" type="image/svg+xml" href="/LPallPatt.svg" />
+  <title>Siemens Pallet Editor</title>
 </head>
 <body>
-<header class="topbar">
-  <div class="row">
+<div id="app">
+  <div class="topbar row">
     <div class="group">
-      <label>Pallet W (mm)
-        <input id="palletW" type="number" min="100" step="10" value="1200" />
-      </label>
-      <label>Pallet D (mm)
-        <input id="palletD" type="number" min="100" step="10" value="800" />
-      </label>
-      <label>Grid (mm)
-        <input id="grid" type="number" min="1" step="1" value="10" />
-      </label>
+      <label>Pallet W (mm)<input type="number" id="palletW" value="1200"></label>
+      <label>Pallet D (mm)<input type="number" id="palletD" value="800"></label>
+      <label>Grid (mm)<input type="number" id="grid" value="20"></label>
     </div>
-
     <div class="group">
-      <label>Box W (mm)
-        <input id="boxW" type="number" min="10" step="1" value="300" />
-      </label>
-      <label>Box D (mm)
-        <input id="boxD" type="number" min="10" step="1" value="200" />
-      </label>
-
-      <button id="btnAdd">Add box</button>
-      <button id="btnRotate" title="Rotate selected 90°">Rotate</button>
-      <button id="btnDelete" title="Delete selected">Delete</button>
-      <button id="btnFit" title="Fit view">Fit</button>
+      <label>Box W (mm)<input type="number" id="boxW" value="300"></label>
+      <label>Box D (mm)<input type="number" id="boxD" value="200"></label>
+      <button id="btnAdd">Add Box</button>
     </div>
-
     <div class="group grow">
-      <div class="hint">
-        Drag to move box (touch supported). Right-drag to pan. Wheel to zoom.
+      <button id="btnRotate">Rotate</button>
+      <button id="btnDelete">Delete</button>
+      <button id="btnFit">Fit View</button>
+      <button id="btnClear">Clear</button>
+    </div>
+    <!-- PLC Controls -->
+    <div class="group" style="border-color: var(--accent);">
+      <button id="btnPlcLogin" style="color: var(--accent);">Login PLC</button>
+      <button id="btnPlcWrite" disabled>Write Pattern</button>
+    </div>
+  </div>
+
+  <div class="layout">
+    <div class="canvasWrap">
+      <canvas id="c"></canvas>
+      <div id="status" class="status">Ready</div>
+    </div>
+
+    <div class="side">
+      <h3>Recipe JSON</h3>
+      <div class="sideButtons">
+        <button id="btnExport">Export</button>
+        <button id="btnImport">Import</button>
+      </div>
+      <textarea id="json"></textarea>
+
+      <h3>PLC Communication</h3>
+      <div class="small">
+        Target DB: <code>"PalletDB"</code><br/>
+        Status: <span id="plcStatus" style="color: var(--muted)">Not Connected</span>
       </div>
     </div>
   </div>
-</header>
+</div>
 
-<main class="layout">
-  <section class="canvasWrap">
-    <canvas id="c"></canvas>
-    <div class="status" id="status"></div>
-  </section>
-
-  <aside class="side">
-    <h3>Recipe JSON</h3>
-    <div class="sideButtons">
-      <button id="btnExport">Export</button>
-      <button id="btnImport">Import</button>
-      <button id="btnClear">Clear</button>
+<!-- Login Modal (Hidden by default) -->
+<dialog id="loginDialog" style="border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 8px; padding: 20px;">
+  <form method="dialog" style="display: flex; flex-direction: column; gap: 10px;">
+    <h3>PLC Login</h3>
+    <label>Username <input type="text" id="plcUser" value="admin"></label>
+    <label>Password <input type="password" id="plcPass"></label>
+    <div style="display: flex; gap: 10px; margin-top: 10px;">
+      <button id="btnDoLogin" value="login" style="background: var(--accent); color: #000;">Login</button>
+      <button value="cancel">Cancel</button>
     </div>
-    <textarea id="json" spellcheck="false"></textarea>
-    <div class="small">
-      Tip: keep the JSON short if you later store it in PLC tags.
-    </div>
-  </aside>
-</main>
+  </form>
+</dialog>
 
 <script type="module" src="/src/main.ts"></script>
 </body>
