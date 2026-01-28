@@ -5,8 +5,14 @@ import "./style.css";
     ApiLogin,
     PlcProgramWrite,
     RequestConfig,
-    PlcProgramRead
+    PlcProgramRead,
+     
 } from '@siemens/simatic-s7-webserver-api';
+ 
+ import {AuthService} from "./services/auth.services";
+ import {PlcProgramService} from "./services/plcprogram.service";
+ import {RequestConfigService} from "./services/request-config.service";
+ 
 
 // Mocking the classes based on your provided service files for standalone execution here:
 /*class RequestConfig {
@@ -162,13 +168,13 @@ let rafScheduled = false;
 class PlcManager {
     private config: RequestConfig;
     private authToken: string | null = null;
-    private dbName = '"PalletDB"'; // Adjust to match your PLC DB name
+    private dbName = '"GDB_Palletizing"'; // Adjust to match your PLC DB name
 
     constructor() {
         this.config = new RequestConfig();
         // In a real scenario hosted on the PLC, window.location.hostname is correct.
         // For local dev, you might hardcode the PLC IP.
-        this.config.address = window.location.hostname || '192.168.0.1';
+        this.config.address = window.location.hostname || '192.168.0.10';
     }
 
     get isAuthenticated() {
