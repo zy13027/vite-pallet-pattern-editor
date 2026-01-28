@@ -2,15 +2,82 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <link rel="icon" type="image/svg+xml" href="/LPallPatt.svg" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!--add favicon from LPallPatt.svg from public folder-->
+    <link rel="icon" type="image/svg+xml" href="/LPallPatt.svg" />
   <title>Siemens Pallet Editor</title>
 </head>
 <body>
-<!-- React will mount the application here -->
-<div id="root"></div>
+<div id="app">
+  <div class="editor-container">
+    <div class="topbar">
+      <div class="row">
+        <h2 style="margin:0; margin-right: 1rem; color: #fff;">Siemens Pallet Editor</h2>
 
-<!-- Note the change from .ts to .tsx -->
-<script type="module" src="/src/main.tsx"></script>
+        <div class="group">
+          <label>Pallet W (mm) <input type="number" id="palletW" value="1200"></label>
+          <label>Pallet D (mm) <input type="number" id="palletD" value="800"></label>
+          <label>Grid (mm) <input type="number" id="grid" value="50"></label>
+        </div>
+
+        <div class="group">
+          <label>Box W (mm) <input type="number" id="boxW" value="300"></label>
+          <label>Box D (mm) <input type="number" id="boxD" value="200"></label>
+          <button id="btnAdd">Add Box</button>
+        </div>
+
+        <div class="group">
+          <button id="btnRotate">Rotate</button>
+          <button id="btnDelete">Delete</button>
+          <button id="btnFit">Fit View</button>
+          <button id="btnClear">Clear</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="layout">
+      <div class="canvasWrap">
+        <canvas id="c"></canvas>
+        <div id="status" class="status">Ready</div>
+      </div>
+
+      <div class="side">
+        <h3>PLC Communication</h3>
+        <div class="group" style="width:100%; display:block; margin-bottom:10px;">
+          <div class="small">Target DB: "GDB_Palletizing"</div>
+          <div class="small">Status: <span id="plcStatus" style="font-weight:bold; color:var(--muted)">Not Connected</span></div>
+        </div>
+        <div class="sideButtons">
+          <button id="btnPlcLogin" style="width:100%">Login PLC</button>
+          <button id="btnPlcWrite" style="width:100%" disabled>Write Pattern</button>
+        </div>
+
+        <hr style="border:0; border-top:1px solid var(--line); width:100%; margin: 15px 0;">
+
+        <h3>Recipe JSON</h3>
+        <div class="sideButtons">
+          <button id="btnExport">Export</button>
+          <button id="btnImport">Import</button>
+        </div>
+        <textarea id="json" spellcheck="false"></textarea>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Login Dialog -->
+<dialog id="loginDialog" style="background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 10px; padding: 20px;">
+  <h3 style="margin-top:0">PLC Login</h3>
+  <form method="dialog" style="display:flex; flex-direction:column; gap:10px;">
+    <label>Username <input type="text" id="plcUser" value="Admin"></label>
+    <label>Password <input type="password" id="plcPass" value="12345678"></label>
+    <div style="display:flex; gap:10px; margin-top:10px; justify-content:flex-end;">
+      <button type="button" onclick="document.getElementById('loginDialog').close()">Cancel</button>
+      <button id="btnDoLogin">Login</button>
+    </div>
+  </form>
+</dialog>
+
+<script type="module" src="/src/main.ts"></script>
 </body>
 </html>
