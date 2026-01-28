@@ -3,29 +3,24 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <!--add favicon from LPallPatt.svg from public folder-->
-    <link rel="icon" type="image/svg+xml" href="/LPallPatt.svg" />
   <title>Siemens Pallet Editor</title>
 </head>
 <body>
 <div id="app">
-  <div class="editor-container">
-    <div class="topbar">
-      <div class="row">
-        <h2 style="margin:0; margin-right: 1rem; color: #fff;">Siemens Pallet Editor</h2>
-
+  <div class="layout">
+    <!-- Main Editor Area -->
+    <div class="main-col">
+      <div class="topbar row">
         <div class="group">
-          <label>Pallet W (mm) <input type="number" id="palletW" value="1200"></label>
-          <label>Pallet D (mm) <input type="number" id="palletD" value="800"></label>
-          <label>Grid (mm) <input type="number" id="grid" value="50"></label>
+          <label>Pallet W (mm) <input id="palletW" type="number" value="1200"></label>
+          <label>Pallet D (mm) <input id="palletD" type="number" value="800"></label>
+          <label>Grid (mm) <input id="grid" type="number" value="20"></label>
         </div>
-
         <div class="group">
-          <label>Box W (mm) <input type="number" id="boxW" value="300"></label>
-          <label>Box D (mm) <input type="number" id="boxD" value="200"></label>
+          <label>Box W (mm) <input id="boxW" type="number" value="300"></label>
+          <label>Box D (mm) <input id="boxD" type="number" value="200"></label>
           <button id="btnAdd">Add Box</button>
         </div>
-
         <div class="group">
           <button id="btnRotate">Rotate</button>
           <button id="btnDelete">Delete</button>
@@ -33,45 +28,54 @@
           <button id="btnClear">Clear</button>
         </div>
       </div>
-    </div>
 
-    <div class="layout">
       <div class="canvasWrap">
         <canvas id="c"></canvas>
         <div id="status" class="status">Ready</div>
       </div>
+    </div>
 
-      <div class="side">
-        <h3>PLC Communication</h3>
-        <div class="group" style="width:100%; display:block; margin-bottom:10px;">
-          <div class="small">Target DB: "GDB_Palletizing"</div>
-          <div class="small">Status: <span id="plcStatus" style="font-weight:bold; color:var(--muted)">Not Connected</span></div>
-        </div>
-        <div class="sideButtons">
-          <button id="btnPlcLogin" style="width:100%">Login PLC</button>
-          <button id="btnPlcWrite" style="width:100%" disabled>Write Pattern</button>
-        </div>
-
-        <hr style="border:0; border-top:1px solid var(--line); width:100%; margin: 15px 0;">
-
-        <h3>Recipe JSON</h3>
-        <div class="sideButtons">
-          <button id="btnExport">Export</button>
-          <button id="btnImport">Import</button>
-        </div>
-        <textarea id="json" spellcheck="false"></textarea>
+    <!-- Sidebar -->
+    <div class="side">
+      <h3>PLC Communication</h3>
+      <div class="group grow" style="display:block; margin-bottom:10px;">
+        <div class="hint">Target DB: "GDB_Palletizing"</div>
+        <div class="hint">Status: <span id="plcStatus" style="font-weight:bold">Not Connected</span></div>
       </div>
+
+      <div class="sideButtons">
+        <button id="btnPlcLogin" style="width:100%">Login PLC</button>
+        <button id="btnPlcWrite" disabled style="width:100%">Write Pattern</button>
+        <button id="btnPlcRead" style="width:100%">Read Pattern</button>
+      </div>
+
+      <hr style="width:100%; border:0; border-top:1px solid var(--line); margin: 15px 0;">
+
+      <h3>Recipe JSON</h3>
+      <div class="sideButtons">
+        <button id="btnExport">Export</button>
+        <button id="btnImport">Import</button>
+      </div>
+      <textarea id="json" spellcheck="false"></textarea>
     </div>
   </div>
 </div>
 
-<!-- Login Dialog -->
-<dialog id="loginDialog" style="background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 10px; padding: 20px;">
-  <h3 style="margin-top:0">PLC Login</h3>
-  <form method="dialog" style="display:flex; flex-direction:column; gap:10px;">
-    <label>Username <input type="text" id="plcUser" value="Admin"></label>
-    <label>Password <input type="password" id="plcPass" value="12345678"></label>
-    <div style="display:flex; gap:10px; margin-top:10px; justify-content:flex-end;">
+<!-- Login Dialog (Hidden by default) -->
+<dialog id="loginDialog">
+  <form method="dialog">
+    <h3>PLC Login</h3>
+    <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:15px;">
+      <label>
+        Username
+        <input type="text" id="plcUser" value="admin" style="width:100%">
+      </label>
+      <label>
+        Password
+        <input type="password" id="plcPass" value="" style="width:100%">
+      </label>
+    </div>
+    <div style="display:flex; justify-content:flex-end; gap:10px;">
       <button type="button" onclick="document.getElementById('loginDialog').close()">Cancel</button>
       <button id="btnDoLogin">Login</button>
     </div>

@@ -1,81 +1,8 @@
 import "./style.css";
-
-// --- Siemens API Mock (Replace with actual import in real project) ---
- import {
-    ApiLogin,
-    PlcProgramWrite,
-    RequestConfig,
-    PlcProgramRead,
-     
-} from '@siemens/simatic-s7-webserver-api';
- 
- import {AuthService} from "./services/auth.services";
- import {PlcProgramService} from "./services/plcprogram.service";
- import {RequestConfigService} from "./services/request-config.service";
- 
-
-// Mocking the classes based on your provided service files for standalone execution here:
-/*class RequestConfig {
-    public protocol: string = 'https';
-    public verifyTls: boolean = false;
-    public address: string = window.location.hostname || '192.168.0.1';
-}
-
-class ApiLogin {
-    constructor(private config: RequestConfig, private user: string, private pass: string) {}
-    async execute() {
-        // In real usage, this calls the PLC API
-        console.log(`[Mock] Logging in to ${this.config.address} as ${this.user}...`);
-        // Simulate network delay
-        await new Promise(r => setTimeout(r, 500));
-        return { result: "mock_token_12345", error: null };
-    }
-}
-
-class PlcProgramWrite {
-    constructor(
-        private config: RequestConfig,
-        private token: string,
-        private tag: string,
-        private value: any,
-        private mode: string = 'simple'
-    ) {}
-
-    // The library supports bulk execution via static method or instance method depending on version,
-    // but based on your DataView component, we will implement a bulk helper below.
-    async execute() {
-        console.log(`[Mock] Writing ${this.value} to ${this.tag}`);
-        return { result: true };
-    }
-
-    // Mocking the bulk functionality used in your reference
-    async bulkExecute(params: {var: string, value: any, mode: string}[]) {
-        console.log(`[Mock] Bulk writing ${params.length} tags...`);
-        await new Promise(r => setTimeout(r, 800));
-        return params.map(() => ({ result: true }));
-    }
-}
-
-class PlcProgramRead {
-    constructor(
-        private config: RequestConfig,
-        private token: string,
-        private tag: string,
-        private mode: string = 'simple'
-    ) {}
-
-    async execute() {
-        console.log(`[Mock] Reading ${this.tag}`);
-        return { result: 42 }; // Mocked value
-    }
-
-    async bulkExecute(params: {var: string, mode: string}[]) {
-        console.log(`[Mock] Bulk reading ${params.length} tags...`);
-        await new Promise(r => setTimeout(r, 800));
-        return params.map(() => ({ result: 42 })); // Mocked values
-    }
-}*/
-
+import { AuthService } from "./services/auth.services";
+import { PlcProgramService } from "./services/plcprogram.service";
+import { RequestConfigService } from "./services/request-config.service";
+import { interval, Subscription, switchMap } from "rxjs";
 // --- Application Types ---
 
 type Rot = 0 | 90;
@@ -95,6 +22,11 @@ type Recipe = {
     boxes: Array<{ x: number; y: number; w: number; d: number; rot: Rot }>;
 };
 
+interface DataStruct {
+    pallet: { w: number; d: number };
+    grid: number;
+    boxes: Array<{ x: number; y: number; w: number; d: number; rot: Rot }>;
+}
 // --- DOM Helpers ---
 
 const $ = <T extends HTMLElement>(sel: string) => {
@@ -128,6 +60,7 @@ const jsonEl = $<HTMLTextAreaElement>("#json");
 // PLC Elements
 const btnPlcLogin = $<HTMLButtonElement>("#btnPlcLogin");
 const btnPlcWrite = $<HTMLButtonElement>("#btnPlcWrite");
+const btnPlcRead = $<HTMLButtonElement>("#btnPlcRead");
 const loginDialog = $<HTMLDialogElement>("#loginDialog");
 const btnDoLogin = $<HTMLButtonElement>("#btnDoLogin");
 const inputPlcUser = $<HTMLInputElement>("#plcUser");
@@ -163,52 +96,78 @@ let lastPointerY = 0;
 let dirty = true;
 let rafScheduled = false;
 
-// --- PLC Logic ---
+// --- PLC Logic Integration ---
 
 class PlcManager {
-    private config: RequestConfig;
-    private authToken: string | null = null;
+    private authService: AuthService;
+    private plcService: PlcProgramService;
+    private requestConfigService: RequestConfigService;
+
     private dbName = '"GDB_Palletizing"'; // Adjust to match your PLC DB name
 
+    // Fixing the declaration of pollingSubscription
+    private pollingSubscription: Subscription | null = null;
+    public dataStructArray: DataStruct[] = [];
+    
     constructor() {
-        this.config = new RequestConfig();
-        // In a real scenario hosted on the PLC, window.location.hostname is correct.
-        // For local dev, you might hardcode the PLC IP.
-        this.config.address = window.location.hostname || '192.168.0.10';
-    }
-
-    get isAuthenticated() {
-        return this.authToken !== null;
+        this.requestConfigService = new RequestConfigService();
+        this.authService = new AuthService(this.requestConfigService);
+        this.plcService = new PlcProgramService();
     }
 
     async login(user: string, pass: string): Promise<boolean> {
-        try {
-            const apiLogin = new ApiLogin(this.config, user, pass);
-            const response = await apiLogin.execute();
-            if (!response) {
-                console.error("Login failed: empty response");
-                return false;
-            }
+        // In local dev, window.location.hostname might be localhost. 
+        // You might want to hardcode IP if testing against a real PLC from your PC.
+        const ip = window.location.hostname === 'localhost' ? '192.168.0.10' : window.location.hostname;
 
-            if (response.result) {
-                this.authToken = response.result;
-                return true;
-            }
-            console.error("Login failed:", response.error);
-            return false;
-        } catch (e) {
-            console.error("Login exception:", e);
-            return false;
-        }
+        return await this.authService.loginToPLC(ip, user, pass);
+    }
+
+    viteOnInit() {
+        this.startDataPolling();
+    }
+
+    viteOnDestroy() {
+        this.stopDataPolling();
+    }
+    
+    // start data polling
+    public startDataPolling() {
+        this.pollingSubscription = interval(2000)
+            .pipe(switchMap(() => this.readPattern()))
+            .subscribe(
+                (data) => {
+                    this.dataStructArray = data;
+                },
+                (error) => console.error('Error during data polling:', error)
+            );
+    }
+
+    // stop data polling
+   public stopDataPolling() {
+       if (this.pollingSubscription) {
+            this.pollingSubscription.unsubscribe();
+            this.pollingSubscription = null;
+       } 
     }
 
     async writePattern(boxes: Box[]) {
-        if (!this.authToken) return;
+        const token = this.authService.getAuthToken();
+        if (!token) {
+            console.error("Cannot write: No auth token available");
+            return false;
+        }
+
+        // We need the config to create the write request
+        // Note: Your AuthService creates a config internally, but we need one here too.
+        // Ideally, AuthService exposes its config, or we recreate it.
+        const config = this.requestConfigService.createConfig('https', false);
+        // Ensure address is set correctly (same logic as login)
+        config.address = window.location.hostname === 'localhost' ? '192.168.0.1' : window.location.hostname;
 
         // Prepare bulk write array
         // We assume the PLC has an array of structs: "PalletDB".Boxes[1..N]
         // and a count variable: "PalletDB".BoxCount
-
         const paramsArray: { var: string, value: any, mode: string }[] = [];
 
         // 1. Write Count
@@ -219,10 +178,9 @@ class PlcManager {
         });
 
         // 2. Write Boxes
-        // Note: PLC arrays are typically 1-based, JS is 0-based.
         boxes.forEach((b, i) => {
-            const idx = i + 1; // 1-based index for PLC
-            const prefix = `${this.dbName}.Boxes[${idx}]`;
+            const idx = i + 1; // 1-based index for PLC arrays usually
+            const prefix = `${this.dbName}.web_data[${idx}]`;
 
             paramsArray.push(
                 { var: `${prefix}.x`, value: Math.round(b.x), mode: 'simple' },
@@ -233,31 +191,49 @@ class PlcManager {
             );
         });
 
-        // 3. Execute Bulk Write
-        // We instantiate PlcProgramWrite just to access the bulk method (pattern from library)
-        // Or we use a helper if the library structure requires it.
-        // Based on your provided `plcprogram.service.ts`, `createPlcProgramWrite` returns an instance.
-        // The library usually has a static `bulkExecute` or instance `bulkExecute`.
-
         try {
-            // Using a dummy instance to access bulk method as per common patterns in this lib
-            const writer = new PlcProgramWrite(this.config, this.authToken, '', '');
+            // Use the service to create the writer
+            // Note: The library's bulkExecute is usually a method on an instance
+            // We create a dummy write instance just to access the bulk mechanism
+            const writer = this.plcService.createPlcProgramWrite(config, token, '', '');
+
+            // Execute
             await writer.bulkExecute(paramsArray);
-
-            // Optional: read back for a lightweight verification
-            const token = this.authToken;
-            if (!token) {
-                console.error("Not authenticated");
-                return false;
-            }
-            const readParams = paramsArray.map(p => ({ var: p.var, mode: p.mode }));
-            const reader = new PlcProgramRead(this.config, token, '', '');
-            await reader.bulkExecute(readParams);
-
             return true;
         } catch (e) {
             console.error("Write failed", e);
             return false;
+        }
+    }
+    
+    async readPattern(): Promise<DataStruct[]> {
+        const token = this.authService.getAuthToken();
+        if (!token) {
+            console.error("Cannot read: No auth token available");
+            return [];
+        }
+
+        const config = this.requestConfigService.createConfig('https', false);
+        config.address = window.location.hostname === 'localhost' ? '192.168.0.10' : window.location.hostname;
+        const paramsArray  = [];
+        const numberOfRows : number = 20;
+        for (let i = 1; i < numberOfRows; i++) {
+            const prefix = `${this.dbName}.web_data[${i}]`;
+            paramsArray.push({var: `${prefix}.l`, mode: 'simple'});
+            paramsArray.push({var: `${prefix}.w`, mode: 'simple'});
+            paramsArray.push({var: `${prefix}.rot`, mode: 'simple'});
+            paramsArray.push({var: `${prefix}.x`, mode: 'simple'});
+            paramsArray.push({var: `${prefix}.y`, mode: 'simple'});
+        }
+        try {
+            const plcReader = this.plcService.createPlcProgramRead(config, token,'');
+            const responses = await plcReader.bulkExecute(paramsArray);
+            if (!responses) return [];
+            // TODO: map responses into structured data; placeholder returns empty array for now.
+            return [];
+        } catch (e) {
+            console.error("Read failed", e);
+            return [];
         }
     }
 }
@@ -578,6 +554,14 @@ btnPlcWrite.addEventListener("click", async () => {
     }
 });
 
+btnPlcRead.addEventListener("click", async () => {
+    plcStatusEl.textContent = "Reading...";
+    const data = await plcManager.readPattern();
+    const success = Array.isArray(data);
+    plcStatusEl.textContent = success ? "Read Success" : "Read Failed";
+    plcStatusEl.style.color = success ? "var(--ok)" : "var(--danger)";
+});
+
 // Canvas Interaction
 canvas.addEventListener("pointerdown", (e) => {
     canvas.setPointerCapture(e.pointerId);
@@ -665,3 +649,5 @@ window.addEventListener("keydown", (e) => {
 updateFromInputs();
 fitView();
 draw();
+// Start the PLC Manager logic
+plcManager.viteOnInit(); 
