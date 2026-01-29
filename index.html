@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" type="image/svg+xml" href="/LPallPatt.svg" />
   <title>Siemens Pallet Editor</title>
 </head>
 <body>
@@ -13,12 +14,14 @@
       <div class="topbar row">
         <div class="group">
           <label>Pallet W (mm) <input id="palletW" type="number" value="1200"></label>
-          <label>Pallet D (mm) <input id="palletD" type="number" value="800"></label>
+          <label>Pallet L (mm) <input id="palletL" type="number" value="800"></label>
           <label>Grid (mm) <input id="grid" type="number" value="20"></label>
         </div>
         <div class="group">
-          <label>Box W (mm) <input id="boxW" type="number" value="300"></label>
-          <label>Box D (mm) <input id="boxD" type="number" value="200"></label>
+          <label>Prod W (mm) <input id="prodW" type="number" value="300"></label>
+          <label>Prod L (mm) <input id="prodL" type="number" value="200"></label>
+          <label>Prod H (mm) <input id="prodH" type="number" value="200"></label>
+          <label>Layers <input id="numLayers" type="number" value="1"></label>
           <button id="btnAdd">Add Box</button>
         </div>
         <div class="group">
@@ -68,11 +71,11 @@
     <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:15px;">
       <label>
         Username
-        <input type="text" id="plcUser" value="admin" style="width:100%">
+        <input type="text" id="plcUser" value="Admin" style="width:100%">
       </label>
       <label>
         Password
-        <input type="password" id="plcPass" value="" style="width:100%">
+        <input type="password" id="plcPass" value="12345678" style="width:100%">
       </label>
     </div>
     <div style="display:flex; justify-content:flex-end; gap:10px;">

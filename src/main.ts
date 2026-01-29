@@ -12,20 +12,20 @@ type Box = {
     x: number; // center (mm)
     y: number; // center (mm)
     w: number; // mm
-    d: number; // mm
+    l: number; // mm
     rot: Rot;
 };
 
 type Recipe = {
-    pallet: { w: number; d: number };
+    pallet: { w: number; l: number };
     grid: number;
-    boxes: Array<{ x: number; y: number; w: number; d: number; rot: Rot }>;
+    boxes: Array<{ x: number; y: number; w: number; l: number; rot: Rot }>;
 };
 
 interface DataStruct {
-    pallet: { w: number; d: number };
+    pallet: { w: number; l: number };
     grid: number;
-    boxes: Array<{ x: number; y: number; w: number; d: number; rot: Rot }>;
+    boxes: Array<{ x: number; y: number; w: number; l: number; rot: Rot }>;
 }
 // --- DOM Helpers ---
 
@@ -42,10 +42,12 @@ const statusEl = $<HTMLDivElement>("#status");
 const plcStatusEl = $<HTMLSpanElement>("#plcStatus");
 
 const palletWEl = $<HTMLInputElement>("#palletW");
-const palletDEl = $<HTMLInputElement>("#palletD");
+const palletDEl = $<HTMLInputElement>("#palletL");
 const gridEl = $<HTMLInputElement>("#grid");
-const boxWEl = $<HTMLInputElement>("#boxW");
-const boxDEl = $<HTMLInputElement>("#boxD");
+const prodWEl = $<HTMLInputElement>("#prodW");
+const prodDEl = $<HTMLInputElement>("#prodL");
+const prodHEl = $<HTMLInputElement>("#prodH"); // You need to add this to HTML
+const numLayersEl = $<HTMLInputElement>("#numLayers"); // You need to add this to HTML
 
 const btnAdd = $<HTMLButtonElement>("#btnAdd");
 const btnRotate = $<HTMLButtonElement>("#btnRotate");
@@ -73,7 +75,7 @@ const ctx = rawCtx;
 // --- State ---
 
 let palletW = 1200;
-let palletD = 800;
+let palletL = 800;
 let grid = 20;
 
 let boxes: Box[] = [];
@@ -103,7 +105,7 @@ class PlcManager {
     private plcService: PlcProgramService;
     private requestConfigService: RequestConfigService;
 
-    private dbName = '"GDB_Palletizing"'; // Adjust to match your PLC DB name
+    private dbName = '"GDB_Palletizing"'; // Adjust to match PLC DB name
 
     // Fixing the declaration of pollingSubscription
     private pollingSubscription: Subscription | null = null;
@@ -117,7 +119,7 @@ class PlcManager {
 
     async login(user: string, pass: string): Promise<boolean> {
         // In local dev, window.location.hostname might be localhost. 
-        // You might want to hardcode IP if testing against a real PLC from your PC.
+        // You might want to hardcode IP if testing against a real PLC from PC.
         const ip = window.location.hostname === 'localhost' ? '192.168.0.10' : window.location.hostname;
 
         return await this.authService.loginToPLC(ip, user, pass);
@@ -158,47 +160,51 @@ class PlcManager {
             return false;
         }
 
-        // We need the config to create the write request
-        // Note: Your AuthService creates a config internally, but we need one here too.
-        // Ideally, AuthService exposes its config, or we recreate it.
+        // 1. Validation: The PLC Array "web_data" is size 20 which row of plc db "web_data[1..20]" 
+        if (boxes.length > 20) {
+            alert("PLC Limit Reached: Max 20 boxes per layer allowed.");
+            return false;
+        }
+
         const config = this.requestConfigService.createConfig('https', false);
-        // Ensure address is set correctly (same logic as login)
         config.address = window.location.hostname === 'localhost' ? '192.168.0.10' : window.location.hostname;
 
-        // Prepare bulk write array
-        // We assume the PLC has an array of structs: "PalletDB".Boxes[1..N]
-        // and a count variable: "PalletDB".BoxCount
         const paramsArray: { var: string, value: any, mode: string }[] = [];
 
-        // 1. Write Count
-        paramsArray.push({
-            var: `${this.dbName}.web_ProductCount`,
-            value: boxes.length,
-            mode: 'simple'
-        });
+        // 2. Write Configuration (Height & Layers)
+        // This fulfills "Option A": Sending the Z-height info to the PLC
+        const layerHeight = parseInt(prodHEl.value) || 200;
+        const layerCount = parseInt(numLayersEl.value) || 1;
 
-        // 2. Write Boxes
+        paramsArray.push(
+            { var: `${this.dbName}.PatternConfig.productDimension.height`, value: layerHeight, mode: 'simple' },
+            { var: `${this.dbName}.PatternConfig.layers`, value: layerCount, mode: 'simple' },
+            { var: `${this.dbName}.useWebPattern`, value: true, mode: 'simple' }, // Enable Web Mode
+            { var: `${this.dbName}.web_ProductCount`, value: boxes.length, mode: 'simple' }
+        );
+
+        // 3. Write Web Data Array
         boxes.forEach((b, i) => {
-            const idx = i + 1; // 1-based index for PLC arrays usually
+            const idx = i + 1;
             const prefix = `${this.dbName}.web_data[${idx}]`;
-        // Row of DB web_data is hardcoded is 20 in PLC temporarily, so we must ensure we don't exceed that
+
             paramsArray.push(
-                { var: `${prefix}.x`, value: Math.round(b.x), mode: 'simple' },
-                { var: `${prefix}.y`, value: Math.round(b.y), mode: 'simple' },
-                { var: `${prefix}.l`, value: Math.round(b.w), mode: 'simple' },
-                { var: `${prefix}.d`, value: Math.round(b.d), mode: 'simple' },
-                { var: `${prefix}.rot`, value: b.rot, mode: 'simple' }
+                { var: `${prefix}.x`, value: b.x, mode: 'simple' }, // LReal
+                { var: `${prefix}.y`, value: b.y, mode: 'simple' }, // LReal
+                { var: `${prefix}.w`, value: b.w, mode: 'simple' }, // LReal
+                { var: `${prefix}.l`, value: b.l, mode: 'simple' }, // LReal 
+                { var: `${prefix}.rot`, value: b.rot, mode: 'simple' } // Int
             );
         });
 
         try {
-            // Use the service to create the writer
-            // Note: The library's bulkExecute is usually a method on an instance
-            // We create a dummy write instance just to access the bulk mechanism
             const writer = this.plcService.createPlcProgramWrite(config, token, '', '');
-
-            // Execute
             await writer.bulkExecute(paramsArray);
+
+            // OPTIONAL: Trigger the Pattern Generator Execution
+            // You might want to set a "Generate" bit here if your PLC logic requires a rising edge
+            // await this.triggerGeneration(config, token); 
+
             return true;
         } catch (e) {
             console.error("Write failed", e);
@@ -216,7 +222,7 @@ class PlcManager {
         const config = this.requestConfigService.createConfig('https', false);
         config.address = window.location.hostname === 'localhost' ? '192.168.0.10' : window.location.hostname;
         const paramsArray  = [];
-        const numberOfRows : number = 20;
+        const numberOfRows : number = 20; // Size of PLC Array "web_data"
         for (let i = 1; i < numberOfRows; i++) {
             const prefix = `${this.dbName}.web_data[${i}]`;
             paramsArray.push({var: `${prefix}.l`, mode: 'simple'});
@@ -224,6 +230,13 @@ class PlcManager {
             paramsArray.push({var: `${prefix}.rot`, mode: 'simple'});
             paramsArray.push({var: `${prefix}.x`, mode: 'simple'});
             paramsArray.push({var: `${prefix}.y`, mode: 'simple'});
+            
+            const prefix2 = `${this.dbName}.GeneratorResults[${i}]`;
+            paramsArray.push({var: `${prefix2}.x`, mode: 'simple'});
+            paramsArray.push({var: `${prefix2}.y`, mode: 'simple'});
+            paramsArray.push({var: `${prefix2}.w`, mode: 'simple'});
+            paramsArray.push({var: `${prefix2}.l`, mode: 'simple'});
+            paramsArray.push({var: `${prefix2}.rot`, mode: 'simple'});
         }
         try {
             const plcReader = this.plcService.createPlcProgramRead(config, token,'');
@@ -251,16 +264,16 @@ function snap(n: number, step: number) {
     return Math.round(n / step) * step;
 }
 
-function getDims(b: Box): { hw: number; hd: number } {
-    const w = b.rot === 0 ? b.w : b.d;
-    const d = b.rot === 0 ? b.d : b.w;
-    return { hw: w / 2, hd: d / 2 };
+function getDims(b: Box): { hw: number; hl: number } {
+    const w = b.rot === 0 ? b.w : b.l;
+    const l = b.rot === 0 ? b.l : b.w;
+    return { hw: w / 2, hl: l / 2 };
 }
 
 function clampBoxToPallet(b: Box) {
-    const { hw, hd } = getDims(b);
+    const { hw, hl } = getDims(b);
     b.x = clamp(b.x, hw, palletW - hw);
-    b.y = clamp(b.y, hd, palletD - hd);
+    b.y = clamp(b.y, hl, palletL - hl);
 }
 
 function worldToScreen(wx: number, wy: number) {
@@ -305,7 +318,7 @@ function drawGrid() {
     const wWorld1 = screenToWorld(rect.width, rect.height);
 
     const x0 = clamp(Math.floor(wWorld0.x / grid) * grid, 0, palletW);
-    const y0 = clamp(Math.floor(wWorld0.y / grid) * grid, 0, palletD);
+    const y0 = clamp(Math.floor(wWorld0.y / grid) * grid, 0, palletL);
 
     ctx.strokeStyle = "rgba(255,255,255,0.06)";
     ctx.lineWidth = 1;
@@ -314,12 +327,12 @@ function drawGrid() {
     for (let x = x0; x <= wWorld1.x; x += grid) {
         if (x < 0 || x > palletW) continue;
         const s0 = worldToScreen(x, 0);
-        const s1 = worldToScreen(x, palletD);
+        const s1 = worldToScreen(x, palletL);
         ctx.moveTo(s0.x, s0.y);
         ctx.lineTo(s1.x, s1.y);
     }
     for (let y = y0; y <= wWorld1.y; y += grid) {
-        if (y < 0 || y > palletD) continue;
+        if (y < 0 || y > palletL) continue;
         const s0 = worldToScreen(0, y);
         const s1 = worldToScreen(palletW, y);
         ctx.moveTo(s0.x, s0.y);
@@ -330,7 +343,7 @@ function drawGrid() {
 
 function drawPallet() {
     const p0 = worldToScreen(0, 0);
-    const p1 = worldToScreen(palletW, palletD);
+    const p1 = worldToScreen(palletW, palletL);
     const x = p0.x, y = p0.y, w = p1.x - p0.x, h = p1.y - p0.y;
 
     ctx.fillStyle = "#0c1724";
@@ -345,9 +358,9 @@ function drawPallet() {
 }
 
 function drawBox(b: Box) {
-    const { hw, hd } = getDims(b);
-    const s0 = worldToScreen(b.x - hw, b.y - hd);
-    const s1 = worldToScreen(b.x + hw, b.y + hd);
+    const { hw, hl } = getDims(b);
+    const s0 = worldToScreen(b.x - hw, b.y - hl);
+    const s1 = worldToScreen(b.x + hw, b.y + hl);
     const isSel = selectedId === b.id;
 
     ctx.fillStyle = isSel ? "rgba(110,168,254,0.22)" : "rgba(255,255,255,0.10)";
@@ -362,7 +375,7 @@ function drawBox(b: Box) {
     ctx.lineWidth = 2;
     ctx.beginPath();
     const c = worldToScreen(b.x, b.y);
-    const tick = worldToScreen(b.x + (b.rot === 0 ? hw : 0), b.y + (b.rot === 90 ? hd : 0));
+    const tick = worldToScreen(b.x + (b.rot === 0 ? hw : 0), b.y + (b.rot === 90 ? hl : 0));
     ctx.moveTo(c.x, c.y);
     ctx.lineTo(tick.x, tick.y);
     ctx.stroke();
@@ -395,7 +408,7 @@ function fitView() {
     const rect = canvas.getBoundingClientRect();
     const margin = 24;
     const sx = (rect.width - margin * 2) / palletW;
-    const sy = (rect.height - margin * 2) / palletD;
+    const sy = (rect.height - margin * 2) / palletL;
     scale = clamp(Math.min(sx, sy), 0.05, 2.0);
     panX = margin;
     panY = margin;
@@ -405,16 +418,16 @@ function fitView() {
 function hitTest(worldX: number, worldY: number): Box | null {
     for (let i = boxes.length - 1; i >= 0; i--) {
         const b = boxes[i];
-        const { hw, hd } = getDims(b);
-        if (worldX >= b.x - hw && worldX <= b.x + hw && worldY >= b.y - hd && worldY <= b.y + hd) return b;
+        const { hw, hl } = getDims(b);
+        if (worldX >= b.x - hw && worldX <= b.x + hw && worldY >= b.y - hl && worldY <= b.y + hl) return b;
     }
     return null;
 }
 
 function addBoxAt(x: number, y: number) {
-    const w = Math.max(10, Number(boxWEl.value) || 300);
-    const d = Math.max(10, Number(boxDEl.value) || 200);
-    const b: Box = { id: nextId++, x: snap(x, grid), y: snap(y, grid), w, d, rot: 0 };
+    const w = Math.max(10, Number(prodWEl.value) || 300);
+    const d = Math.max(10, Number(prodDEl.value) || 200);
+    const b: Box = { id: nextId++, x: snap(x, grid), y: snap(y, grid), w, l: d, rot: 0 };
     clampBoxToPallet(b);
     boxes.push(b);
     selectedId = b.id;
@@ -447,21 +460,22 @@ function clearAll() {
 
 function exportRecipe(): Recipe {
     return {
-        pallet: { w: palletW, d: palletD },
+        pallet: { w: palletW, l: palletL },
         grid,
-        boxes: boxes.map(b => ({ x: b.x, y: b.y, w: b.w, d: b.d, rot: b.rot }))
+        boxes: boxes.map(b => ({ x: b.x, y: b.y, w: b.w, l: b.l, rot: b.rot }))
     };
 }
 
 function importRecipe(text: string) {
     try {
         const data = JSON.parse(text) as Recipe;
-        if (!data?.pallet?.w || !data?.pallet?.d) throw new Error("Invalid recipe");
+        if (!data?.pallet?.w || !data?.pallet?.l) {
+            alert(("Invalid recipe"));}
         palletW = data.pallet.w;
-        palletD = data.pallet.d;
+        palletL = data.pallet.l;
         grid = data.grid || 10;
         palletWEl.value = String(palletW);
-        palletDEl.value = String(palletD);
+        palletDEl.value = String(palletL);
         gridEl.value = String(grid);
         boxes = (data.boxes || []).map((b, idx) => {
             const box: Box = {
@@ -469,7 +483,7 @@ function importRecipe(text: string) {
                 x: snap(Number(b.x), grid),
                 y: snap(Number(b.y), grid),
                 w: Number(b.w),
-                d: Number(b.d),
+                l: Number(b.l),
                 rot: b.rot === 90 ? 90 : 0
             };
             clampBoxToPallet(box);
@@ -485,7 +499,7 @@ function importRecipe(text: string) {
 
 function updateFromInputs() {
     palletW = Math.max(100, Number(palletWEl.value) || palletW);
-    palletD = Math.max(100, Number(palletDEl.value) || palletD);
+    palletL = Math.max(100, Number(palletDEl.value) || palletL);
     grid = Math.max(1, Number(gridEl.value) || grid);
     boxes.forEach(b => {
         b.x = snap(b.x, grid);
@@ -508,7 +522,7 @@ function zoomAt(sx: number, sy: number, factor: number) {
 
 [palletWEl, palletDEl, gridEl].forEach(el => el.addEventListener("change", updateFromInputs));
 
-btnAdd.addEventListener("click", () => addBoxAt(palletW / 2, palletD / 2));
+btnAdd.addEventListener("click", () => addBoxAt(palletW / 2, palletL / 2));
 btnRotate.addEventListener("click", rotateSelected);
 btnDelete.addEventListener("click", deleteSelected);
 btnFit.addEventListener("click", fitView);
