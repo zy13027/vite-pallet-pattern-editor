@@ -110,7 +110,7 @@ class PlcManager {
     // Fixing the declaration of pollingSubscription
     private pollingSubscription: Subscription | null = null;
     public dataStructArray: DataStruct[] = [];
-    
+
     constructor() {
         this.requestConfigService = new RequestConfigService();
         this.authService = new AuthService(this.requestConfigService);
@@ -132,7 +132,7 @@ class PlcManager {
     viteOnDestroy() {
         this.stopDataPolling();
     }
-    
+
     // start data polling
     public startDataPolling() {
         this.pollingSubscription = interval(2000)
@@ -146,11 +146,11 @@ class PlcManager {
     }
 
     // stop data polling
-   public stopDataPolling() {
-       if (this.pollingSubscription) {
+    public stopDataPolling() {
+        if (this.pollingSubscription) {
             this.pollingSubscription.unsubscribe();
             this.pollingSubscription = null;
-       } 
+        }
     }
 
     async writePattern(boxes: Box[]) {
@@ -211,7 +211,7 @@ class PlcManager {
             return false;
         }
     }
-    
+
     async readPattern(): Promise<DataStruct[]> {
         const token = this.authService.getAuthToken();
         if (!token) {
@@ -230,7 +230,7 @@ class PlcManager {
             paramsArray.push({var: `${prefix}.rot`, mode: 'simple'});
             paramsArray.push({var: `${prefix}.x`, mode: 'simple'});
             paramsArray.push({var: `${prefix}.y`, mode: 'simple'});
-            
+
             const prefix2 = `${this.dbName}.GeneratorResults[${i}]`;
             paramsArray.push({var: `${prefix2}.x`, mode: 'simple'});
             paramsArray.push({var: `${prefix2}.y`, mode: 'simple'});
@@ -664,4 +664,24 @@ updateFromInputs();
 fitView();
 draw();
 // Start the PLC Manager logic
-plcManager.viteOnInit(); 
+plcManager.viteOnInit();
+
+// --- Auto Login Logic ---
+(async () => {
+    console.log("Initiating Auto-Login...");
+    plcStatusEl.textContent = "Auto-connecting...";
+
+    // Attempt login with hardcoded credentials
+    const success = await plcManager.login('Admin', '12345678');
+
+    if (success) {
+        plcStatusEl.textContent = "Connected (Auto)";
+        plcStatusEl.style.color = "var(--ok)";
+        btnPlcWrite.disabled = false;
+        btnPlcLogin.textContent = "Logged In";
+        btnPlcLogin.disabled = true;
+    } else {
+        plcStatusEl.textContent = "Auto-login Failed";
+        plcStatusEl.style.color = "var(--danger)";
+    }
+})();
