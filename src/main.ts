@@ -163,7 +163,7 @@ class PlcManager {
         // Ideally, AuthService exposes its config, or we recreate it.
         const config = this.requestConfigService.createConfig('https', false);
         // Ensure address is set correctly (same logic as login)
-        config.address = window.location.hostname === 'localhost' ? '192.168.0.1' : window.location.hostname;
+        config.address = window.location.hostname === 'localhost' ? '192.168.0.10' : window.location.hostname;
 
         // Prepare bulk write array
         // We assume the PLC has an array of structs: "PalletDB".Boxes[1..N]
@@ -172,7 +172,7 @@ class PlcManager {
 
         // 1. Write Count
         paramsArray.push({
-            var: `${this.dbName}.BoxCount`,
+            var: `${this.dbName}.web_ProductCount`,
             value: boxes.length,
             mode: 'simple'
         });
@@ -181,11 +181,11 @@ class PlcManager {
         boxes.forEach((b, i) => {
             const idx = i + 1; // 1-based index for PLC arrays usually
             const prefix = `${this.dbName}.web_data[${idx}]`;
-
+        // Row of DB web_data is hardcoded is 20 in PLC temporarily, so we must ensure we don't exceed that
             paramsArray.push(
                 { var: `${prefix}.x`, value: Math.round(b.x), mode: 'simple' },
                 { var: `${prefix}.y`, value: Math.round(b.y), mode: 'simple' },
-                { var: `${prefix}.w`, value: Math.round(b.w), mode: 'simple' },
+                { var: `${prefix}.l`, value: Math.round(b.w), mode: 'simple' },
                 { var: `${prefix}.d`, value: Math.round(b.d), mode: 'simple' },
                 { var: `${prefix}.rot`, value: b.rot, mode: 'simple' }
             );
