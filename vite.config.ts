@@ -1,17 +1,11 @@
 import { defineConfig } from "vite";
 import { nodePolyfills } from "vite-plugin-node-polyfills";
-import react from "@vitejs/plugin-react";
 import path from "path";
-import { fileURLToPath } from "url";
-
-// Define __dirname for ES module scope
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 export default defineConfig({
-    base: "./",
+    base: "./", // Ensures relative paths for PLC web server
     plugins: [
-        react(),
+        // React plugin removed
         nodePolyfills({
             include: ['buffer', 'stream', 'util', 'process', 'events', 'path', 'url', 'http', 'https'],
             globals: {
@@ -23,8 +17,7 @@ export default defineConfig({
     ],
     resolve: {
         alias: {
-            // FIX: Use path.resolve to point exactly to the file shown in your screenshot.
-            // Structure: node_modules/lucide/dist/esm/lucide/src/lucide.js
+            // Point to the ESM build of lucide for tree-shaking
             "lucide": path.resolve(__dirname, "node_modules/lucide/dist/esm/lucide/src/lucide.js"),
         },
     },
@@ -33,13 +26,13 @@ export default defineConfig({
         emptyOutDir: true,
         target: "es2020",
         sourcemap: false,
-        cssCodeSplit: false,
-        assetsInlineLimit: 0,
+        assetsInlineLimit: 0, // Forces assets to be separate files
         rollupOptions: {
             output: {
                 entryFileNames: "main.js",
                 chunkFileNames: "[name].js",
                 assetFileNames: (assetInfo) => {
+                    // Keep CSS name simple
                     if (assetInfo.name && assetInfo.name.endsWith('.css')) {
                         return 'style.css';
                     }
@@ -47,9 +40,6 @@ export default defineConfig({
                 },
             },
         },
-        commonjsOptions: {
-            include: [/lucide/, /node_modules/],
-        }
     },
     server: {
         host: true

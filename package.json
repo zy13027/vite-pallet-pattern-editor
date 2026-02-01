@@ -5,25 +5,18 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "tsc && vite build",
     "preview": "vite preview --host"
   },
   "devDependencies": {
     "@types/node": "^25.1.0",
-    "@types/react": "^19.2.10",
-    "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react": "^5.1.2",
-    "rxjs": "^7.8.2",
     "typescript": "^5.6.3",
     "vite": "^5.4.8",
     "vite-plugin-node-polyfills": "^0.25.0"
   },
   "dependencies": {
     "@siemens/simatic-s7-webserver-api": "^1.1.2",
-    "framer-motion": "^12.29.2",
     "lucide": "^0.563.0",
-    "lucide-react": "^0.563.0",
-    "react": "^19.2.4",
-    "react-dom": "^19.2.4"
+    "rxjs": "^7.8.2"
   }
 }

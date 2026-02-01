@@ -30,10 +30,12 @@ interface DataStruct {
 }
 
 // --- 1. INJECT OPTIMIZED HTML STRUCTURE ---
+// Note: We inject into #app, which is now styled as the 800x480 container
 document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
   <div class="app-layout">
     <!-- Top Status Bar -->
     <div class="top-bar">
+      <span style="color:var(--accent);">Siemens Pallet Editor</span>
       <span id="status">Ready</span>
       <span id="plcStatus" class="status-indicator">Not Connected</span>
     </div>
@@ -48,7 +50,7 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
       <button id="btnAdd" class="btn-icon"><i data-lucide="box"></i>Add</button>
       <button id="btnRotate" class="btn-icon"><i data-lucide="rotate-cw"></i>Rot</button>
       <button id="btnDelete" class="btn-icon btn-danger"><i data-lucide="trash-2"></i>Del</button>
-      <div style="width: 20px;"></div> <!-- Spacer -->
+      <div style="width: 10px; border-right:1px solid #ddd;"></div> <!-- Spacer -->
       <button id="btnFit" class="btn-icon"><i data-lucide="maximize"></i>Fit</button>
       <button id="btnSettingsToggle" class="btn-icon"><i data-lucide="settings"></i>Cfg</button>
       <button id="btnPlcToggle" class="btn-icon"><i data-lucide="wifi"></i>PLC</button>
@@ -70,7 +72,7 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
         <div class="form-group"><label>Layers</label><input type="number" id="numLayers" value="1"></div>
       </div>
       <div style="margin-top: 20px; display:flex; gap:10px;">
-         <button id="btnClear" class="btn-icon" style="width:100%; height:40px; flex-direction:row;">Clear All</button>
+         <button id="btnClear" class="btn-icon" style="width:100%; height:40px; flex-direction:row; background:#fff;">Clear All</button>
       </div>
     </div>
 
@@ -81,18 +83,18 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
         <button class="close-btn" id="closePlc"><i data-lucide="x"></i></button>
       </div>
       <div class="form-group" style="margin-bottom:15px;">
-        <button id="btnPlcLogin" class="btn-icon" style="width:100%; height:50px; flex-direction:row;">Login</button>
+        <button id="btnPlcLogin" class="btn-icon" style="width:100%; height:40px; flex-direction:row; background:#fff;">Login</button>
       </div>
-      <div class="form-group" style="gap:15px;">
-        <button id="btnPlcWrite" class="btn-icon" style="width:100%; height:50px; flex-direction:row; background:var(--accent);" disabled>Write Pattern</button>
-        <button id="btnPlcRead" class="btn-icon" style="width:100%; height:50px; flex-direction:row;" disabled>Read Pattern</button>
+      <div class="form-group" style="gap:10px;">
+        <button id="btnPlcWrite" class="btn-icon" style="width:100%; height:40px; flex-direction:row; background:var(--accent); color:white; border:none;" disabled>Write Pattern</button>
+        <button id="btnPlcRead" class="btn-icon" style="width:100%; height:40px; flex-direction:row; background:#fff;" disabled>Read Pattern</button>
       </div>
       <div class="form-group" style="margin-top:20px;">
         <label>Recipe JSON</label>
-        <textarea id="json" style="height:100px; background:#0f172a; color:white; border:1px solid #334155;"></textarea>
+        <textarea id="json" style="height:80px;"></textarea>
         <div style="display:flex; gap:10px; margin-top:5px;">
-            <button id="btnExport" style="flex:1; padding:10px;">Export</button>
-            <button id="btnImport" style="flex:1; padding:10px;">Import</button>
+            <button id="btnExport" class="btn-icon" style="flex:1; height:35px; flex-direction:row; background:#fff;">Export</button>
+            <button id="btnImport" class="btn-icon" style="flex:1; height:35px; flex-direction:row; background:#fff;">Import</button>
         </div>
       </div>
     </div>
@@ -107,8 +109,8 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
         <label>Password</label><input type="password" id="plcPass">
       </div>
       <div style="display:flex; justify-content:flex-end; gap:10px;">
-        <button id="btnCancelLogin" style="padding:10px;">Cancel</button>
-        <button id="btnDoLogin" style="padding:10px; background:var(--accent); color:white; border:none;">Login</button>
+        <button id="btnCancelLogin" class="btn-icon" style="width:80px; height:35px; flex-direction:row; background:#fff;">Cancel</button>
+        <button id="btnDoLogin" class="btn-icon" style="width:80px; height:35px; flex-direction:row; background:var(--accent); color:white; border:none;">Login</button>
       </div>
     </dialog>
   </div>
@@ -189,16 +191,13 @@ let panY = 30;
 
 // Interaction
 let isDragging = false;
-let isPanning = false;
 let dragOffsetX = 0;
 let dragOffsetY = 0;
-let lastPointerX = 0;
-let lastPointerY = 0;
 
 let dirty = true;
 let rafScheduled = false;
 
-// --- PLC Manager Class (Keep existing logic, just ensure types match) ---
+// --- PLC Manager Class ---
 class PlcManager {
     private authService: AuthService;
     private plcService: PlcProgramService;
@@ -271,7 +270,7 @@ class PlcManager {
                 { var: `${prefix}.x`, value: b.x, mode: 'simple' },
                 { var: `${prefix}.y`, value: b.y, mode: 'simple' },
                 { var: `${prefix}.w`, value: b.w, mode: 'simple' },
-                { var: `${prefix}.l`, value: b.d, mode: 'simple' }, // Note: PLC uses .l, UI uses .d
+                { var: `${prefix}.l`, value: b.d, mode: 'simple' },
                 { var: `${prefix}.rot`, value: b.rot, mode: 'simple' }
             );
         });
@@ -287,14 +286,13 @@ class PlcManager {
     }
 
     async readPattern(): Promise<DataStruct[]> {
-        // Stub for read logic
         return [];
     }
 }
 
 const plcManager = new PlcManager();
 
-// --- Math & Logic (Keep existing) ---
+// --- Math & Logic ---
 function clamp(n: number, min: number, max: number) { return Math.max(min, Math.min(max, n)); }
 function snap(n: number, step: number) { return step <= 1 ? n : Math.round(n / step) * step; }
 function getDims(b: BoxType) { return { hw: (b.rot === 0 ? b.w : b.d) / 2, hd: (b.rot === 0 ? b.d : b.w) / 2 }; }
@@ -323,7 +321,7 @@ function markDirty() {
     }
 }
 
-// --- Drawing (Keep existing logic, just ensure colors match new theme) ---
+// --- Drawing (UPDATED FOR LIGHT THEME) ---
 function drawGrid() {
     if (grid < 5) return;
     const rect = canvas.getBoundingClientRect();
@@ -332,7 +330,8 @@ function drawGrid() {
     const x0 = clamp(Math.floor(wWorld0.x / grid) * grid, 0, palletW);
     const y0 = clamp(Math.floor(wWorld0.y / grid) * grid, 0, palletD);
 
-    ctx.strokeStyle = "rgba(255,255,255,0.05)";
+    // Light gray grid for light background
+    ctx.strokeStyle = "rgba(0, 0, 0, 0.08)";
     ctx.lineWidth = 1;
     ctx.beginPath();
     for (let x = x0; x <= wWorld1.x; x += grid) {
@@ -356,13 +355,17 @@ function drawPallet() {
     const p0 = worldToScreen(0, 0);
     const p1 = worldToScreen(palletW, palletD);
     const w = p1.x - p0.x, h = p1.y - p0.y;
-    ctx.fillStyle = "#1e293b";
+
+    // Industrial Gray Pallet
+    ctx.fillStyle = "#e2e8f0";
     ctx.fillRect(p0.x, p0.y, w, h);
-    ctx.strokeStyle = "#475569";
+
+    ctx.strokeStyle = "#94a3b8";
     ctx.lineWidth = 2;
     ctx.strokeRect(p0.x, p0.y, w, h);
-    // Origin marker
-    ctx.fillStyle = "#3b82f6";
+
+    // Origin marker (Teal)
+    ctx.fillStyle = "#009999";
     ctx.fillRect(p0.x - 4, p0.y - 4, 8, 8);
 }
 
@@ -372,8 +375,9 @@ function drawBox(b: BoxType) {
     const s1 = worldToScreen(b.x + hw, b.y + hd);
     const isSel = selectedId === b.id;
 
-    ctx.fillStyle = isSel ? "rgba(59, 130, 246, 0.3)" : "rgba(100, 116, 139, 0.3)";
-    ctx.strokeStyle = isSel ? "#3b82f6" : "#94a3b8";
+    // Box Color: Darker gray with Teal selection
+    ctx.fillStyle = isSel ? "rgba(0, 153, 153, 0.2)" : "rgba(255, 255, 255, 0.8)";
+    ctx.strokeStyle = isSel ? "#009999" : "#64748b";
     ctx.lineWidth = isSel ? 2 : 1;
 
     ctx.fillRect(s0.x, s0.y, s1.x - s0.x, s1.y - s0.y);
@@ -387,7 +391,7 @@ function drawBox(b: BoxType) {
     ctx.lineTo(tick.x, tick.y);
     ctx.stroke();
 
-    ctx.fillStyle = "white";
+    ctx.fillStyle = "#333";
     ctx.font = "12px sans-serif";
     ctx.fillText(`#${b.id}`, s0.x + 5, s0.y + 15);
 }
@@ -396,8 +400,8 @@ function draw() {
     dirty = false;
     const rect = canvas.getBoundingClientRect();
     ctx.clearRect(0, 0, rect.width, rect.height);
-    // Background
-    ctx.fillStyle = "#0f172a";
+    // Main Background (Light)
+    ctx.fillStyle = "#f3f4f6";
     ctx.fillRect(0, 0, rect.width, rect.height);
 
     drawPallet();
@@ -408,14 +412,13 @@ function draw() {
     statusEl.textContent = `Box: ${sel ? `#${sel.id}` : "-"} | Total: ${boxes.length}`;
 }
 
-// --- Actions (Keep existing logic) ---
+// --- Actions ---
 function fitView() {
     const rect = canvas.getBoundingClientRect();
     const margin = 40;
     const sx = (rect.width - margin * 2) / palletW;
     const sy = (rect.height - margin * 2) / palletD;
     scale = clamp(Math.min(sx, sy), 0.05, 2.0);
-    // Center logic
     const screenW = palletW * scale;
     const screenH = palletD * scale;
     panX = (rect.width - screenW) / 2;
@@ -517,9 +520,7 @@ function updateFromInputs() {
 }
 
 // --- Event Listeners ---
-// Drawer Toggles
 const toggleDrawer = (el: HTMLElement) => {
-    // Close others
     if (el !== drawerSettings) drawerSettings.classList.remove('open');
     if (el !== drawerPlc) drawerPlc.classList.remove('open');
     el.classList.toggle('open');
@@ -530,14 +531,11 @@ btnPlcToggle.addEventListener("click", () => toggleDrawer(drawerPlc));
 closeSettings.addEventListener("click", () => drawerSettings.classList.remove('open'));
 closePlc.addEventListener("click", () => drawerPlc.classList.remove('open'));
 
-// Canvas Interaction (Pointer events cover Touch on modern browsers)
 canvas.addEventListener("pointerdown", (e) => {
     canvas.setPointerCapture(e.pointerId);
     const rect = canvas.getBoundingClientRect();
     const sx = e.clientX - rect.left;
     const sy = e.clientY - rect.top;
-    lastPointerX = sx;
-    lastPointerY = sy;
     const w = screenToWorld(sx, sy);
 
     const hit = hitTest(w.x, w.y);
@@ -547,8 +545,6 @@ canvas.addEventListener("pointerdown", (e) => {
         dragOffsetX = hit.x - w.x;
         dragOffsetY = hit.y - w.y;
     } else {
-        // If clicking background, deselect. 
-        // Note: Panning removed for simplicity on HMI, use Fit View.
         selectedId = null;
     }
     markDirty();
@@ -576,17 +572,14 @@ canvas.addEventListener("pointerup", (e) => {
     markDirty();
 });
 
-// Button Actions
 btnAdd.addEventListener("click", () => addBoxAt(palletW / 2, palletD / 2));
 btnRotate.addEventListener("click", rotateSelected);
 btnDelete.addEventListener("click", deleteSelected);
 btnFit.addEventListener("click", fitView);
 btnClear.addEventListener("click", () => { clearAll(); jsonEl.value = ""; });
 
-// Settings Inputs
 [palletWEl, palletDEl, gridEl].forEach(el => el.addEventListener("change", updateFromInputs));
 
-// PLC Actions
 btnPlcLogin.addEventListener("click", () => loginDialog.showModal());
 btnCancelLogin.addEventListener("click", () => loginDialog.close());
 
@@ -623,11 +616,9 @@ btnPlcWrite.addEventListener("click", async () => {
     }
 });
 
-// Export/Import
 btnExport.addEventListener("click", () => { jsonEl.value = JSON.stringify(exportRecipe(), null, 2); });
 btnImport.addEventListener("click", () => importRecipe(jsonEl.value));
 
-// Initial Setup
 window.addEventListener("resize", () => { resizeCanvasToCSSPixels(); fitView(); });
 updateFromInputs();
 resizeCanvasToCSSPixels();
