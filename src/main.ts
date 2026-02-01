@@ -5,6 +5,14 @@ import { PlcProgramService } from "./services/plcprogram.service";
 import { RequestConfigService } from "./services/request-config.service";
 import { interval, Subscription, switchMap } from "rxjs";
 
+// --- 0. FAVICON INJECTION ---
+// Dynamically set the favicon to the SVG in the public folder
+const link = document.querySelector("link[rel~='icon']") as HTMLLinkElement || document.createElement('link');
+link.type = 'image/svg+xml';
+link.rel = 'icon';
+link.href = './LPallPatt.svg';
+document.getElementsByTagName('head')[0].appendChild(link);
+
 // ... [Keep your Type definitions: Rot, Box, Recipe, DataStruct here] ...
 type Rot = 0 | 90;
 
@@ -624,3 +632,30 @@ updateFromInputs();
 resizeCanvasToCSSPixels();
 fitView();
 plcManager.viteOnInit();
+
+// --- AUTO LOGIN LOGIC ---
+(async () => {
+    console.log("Attempting Auto-Login...");
+    plcStatusEl.textContent = "Auto-Connecting...";
+
+    // Disable login button while working
+    btnPlcLogin.disabled = true;
+
+    // Credentials provided in prompt
+    const success = await plcManager.login("Admin", "12345678");
+
+    if (success) {
+        console.log("Auto-Login Successful");
+        plcStatusEl.textContent = "Connected";
+        plcStatusEl.style.color = "var(--ok)";
+        btnPlcWrite.disabled = false;
+        btnPlcRead.disabled = false;
+        btnPlcLogin.textContent = "Logged In";
+        btnPlcLogin.disabled = true;
+    } else {
+        console.warn("Auto-Login Failed");
+        plcStatusEl.textContent = "Login Failed";
+        plcStatusEl.style.color = "var(--danger)";
+        btnPlcLogin.disabled = false; // Re-enable so they can try manually
+    }
+})();
