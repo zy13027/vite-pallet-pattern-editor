@@ -1,163 +1,153 @@
 :root {
-  /* Light Theme Variables */
-  --bg: #f8fafc;        /* Slate-50 */
-  --panel: #ffffff;     /* White */
-  --ink: #0f172a;       /* Slate-900 */
-  --muted: #64748b;     /* Slate-500 */
-  --line: #e2e8f0;      /* Slate-200 */
-  --accent: #3b82f6;    /* Blue-500 */
-  --danger: #ef4444;    /* Red-500 */
-  --ok: #22c55e;        /* Green-500 */
-  --pad: 10px;
-  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  --bg: #0f172a;
+  --panel: rgba(30, 41, 59, 0.95);
+  --ink: #f8fafc;
+  --accent: #3b82f6;
+  --danger: #ef4444;
+  --ok: #22c55e;
+  --border: #334155;
 }
 
-* { box-sizing: border-box; }
+* { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
+
 body {
   margin: 0;
+  padding: 0;
   background: var(--bg);
   color: var(--ink);
+  font-family: system-ui, sans-serif;
+  overflow: hidden; /* Critical for HMI */
+  width: 800px;
+  height: 480px;
 }
 
-/* The rest of the CSS remains mostly compatible, 
-   but since we are using Tailwind in React, 
-   much of this file is overridden by main.tsx classes. 
-   We keep it for safety. */
-
-.topbar {
-  background: var(--panel);
-  border-bottom: 1px solid var(--line);
-  padding: var(--pad);
-}
-.row {
-  display: flex;
-  gap: var(--pad);
-  flex-wrap: wrap;
-  align-items: end;
-}
-.group {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  align-items: end;
-  padding: 6px 8px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: rgba(255,255,255,0.03);
-}
-.group.grow { flex: 1 1 auto; min-width: 240px; }
-label {
+/* Main Container */
+.app-layout {
+  position: relative;
+  width: 100%;
+  height: 100%;
   display: flex;
   flex-direction: column;
+}
+
+/* Canvas Layer - Full Screen */
+.canvas-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  touch-action: none; /* Critical for drag/drop on touch */
+}
+
+/* Top Status Bar */
+.top-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 40px;
+  background: rgba(0,0,0,0.6);
+  z-index: 10;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 15px;
+  pointer-events: none; /* Let clicks pass through to canvas if needed */
+}
+.top-bar span { font-size: 14px; font-weight: bold; color: #94a3b8; }
+.status-indicator { pointer-events: auto; }
+
+/* Bottom Toolbar - Main Actions */
+.bottom-bar {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  display: flex;
+  gap: 15px;
+  background: var(--panel);
+  padding: 10px 20px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+}
+
+/* Big Touch Buttons */
+.btn-icon {
+  width: 60px;
+  height: 60px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: #1e293b;
+  color: white;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
   gap: 4px;
-  font-size: 12px;
-  color: var(--muted);
-}
-input {
-  width: 120px;
-  max-width: 42vw;
-  padding: 8px 10px;
-  border-radius: 10px;
-  border: 1px solid var(--line);
-  background: rgba(255,255,255,0.04);
-  color: var(--ink);
-}
-button {
-  padding: 9px 12px;
-  border-radius: 10px;
-  border: 1px solid var(--line);
-  background: rgba(255,255,255,0.06);
-  color: var(--ink);
   cursor: pointer;
 }
-button:hover { border-color: rgba(255,255,255,0.25); }
-button:active { transform: translateY(1px); }
+.btn-icon:active { background: var(--accent); border-color: var(--accent); }
+.btn-icon svg { width: 24px; height: 24px; }
+.btn-danger { color: var(--danger); border-color: var(--danger); }
+.btn-danger:active { background: var(--danger); color: white; }
 
-.hint { font-size: 12px; color: var(--muted); padding: 6px 2px; }
-
-.layout {
-  display: grid;
-  grid-template-columns: 1fr 320px;
-  gap: var(--pad);
-  padding: var(--pad);
-  height: calc(100vh - 86px);
-}
-@media (max-width: 900px) {
-  .layout { grid-template-columns: 1fr; height: auto; }
-}
-
-.canvasWrap {
-  position: relative;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  overflow: hidden;
-  background: #0b1016;
-  min-height: 360px;
-}
-canvas { width: 100%; height: 100%; display: block; }
-.status {
+/* Side Menus (Drawers) */
+.drawer {
   position: absolute;
-  left: 10px;
-  bottom: 10px;
-  padding: 6px 8px;
-  border-radius: 10px;
-  border: 1px solid var(--line);
-  background: rgba(0,0,0,0.4);
-  font-size: 12px;
-  color: var(--muted);
-  pointer-events: none;
-}
-
-.side {
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  padding: var(--pad);
-  background: rgba(255,255,255,0.03);
+  top: 0;
+  right: 0;
+  width: 320px;
+  height: 100%;
+  background: var(--panel);
+  z-index: 20;
+  transform: translateX(100%);
+  transition: transform 0.3s ease;
+  border-left: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  min-height: 360px;
-}
-.side h3 { margin: 6px 0 10px; font-size: 14px; color: var(--ink); }
-.sideButtons {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-bottom: 8px;
-}
-textarea {
-  flex: 1 1 auto;
-  width: 100%;
-  min-height: 220px;
-  resize: vertical;
-  padding: 10px;
-  border-radius: 12px;
-  border: 1px solid var(--line);
-  background: rgba(255,255,255,0.04);
-  color: var(--ink);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 12px;
-  line-height: 1.35;
-}
-.small { margin-top: 8px; color: var(--muted); font-size: 12px; }
-
-/* Dialog Styles */
-dialog {
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--panel);
-  color: var(--ink);
   padding: 20px;
-  box-shadow: 0 10px 25px rgba(0,0,0,0.2);
-  max-width: 400px;
-  width: 100%;
+}
+.drawer.open { transform: translateX(0); }
+
+.drawer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 10px;
+}
+.close-btn { background: none; border: none; color: #94a3b8; font-size: 24px; }
+
+/* Form Elements inside Drawer */
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+  overflow-y: auto;
+}
+.form-group { display: flex; flex-direction: column; gap: 5px; }
+label { font-size: 12px; color: #94a3b8; }
+input {
+  background: #0f172a;
+  border: 1px solid var(--border);
+  color: white;
+  padding: 12px;
+  border-radius: 8px;
+  font-size: 16px; /* Prevents zoom on some browsers */
 }
 
-dialog::backdrop {
-  background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(2px);
+/* Dialogs */
+dialog {
+  background: var(--panel);
+  color: white;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  width: 400px;
 }
-
-dialog h3 {
-  margin-top: 0;
-  margin-bottom: 15px;
-}
+dialog::backdrop { background: rgba(0,0,0,0.7); backdrop-filter: blur(2px); }

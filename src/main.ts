@@ -1,34 +1,126 @@
 import "./style.css";
+import { createIcons, Box, RotateCw, Trash2, Maximize, Settings, Wifi, X } from 'lucide';
 import { AuthService } from "./services/auth.services";
 import { PlcProgramService } from "./services/plcprogram.service";
 import { RequestConfigService } from "./services/request-config.service";
 import { interval, Subscription, switchMap } from "rxjs";
-// --- Application Types ---
 
+// ... [Keep your Type definitions: Rot, Box, Recipe, DataStruct here] ...
 type Rot = 0 | 90;
 
-type Box = {
+type BoxType = {
     id: number;
-    x: number; // center (mm)
-    y: number; // center (mm)
-    w: number; // mm
-    l: number; // mm
+    x: number;
+    y: number;
+    w: number;
+    d: number;
     rot: Rot;
 };
 
 type Recipe = {
-    pallet: { w: number; l: number };
+    pallet: { w: number; d: number };
     grid: number;
-    boxes: Array<{ x: number; y: number; w: number; l: number; rot: Rot }>;
+    boxes: Array<{ x: number; y: number; w: number; d: number; rot: Rot }>;
 };
 
 interface DataStruct {
-    pallet: { w: number; l: number };
+    pallet: { w: number; d: number };
     grid: number;
-    boxes: Array<{ x: number; y: number; w: number; l: number; rot: Rot }>;
+    boxes: Array<{ x: number; y: number; w: number; d: number; rot: Rot }>;
 }
-// --- DOM Helpers ---
 
+// --- 1. INJECT OPTIMIZED HTML STRUCTURE ---
+document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
+  <div class="app-layout">
+    <!-- Top Status Bar -->
+    <div class="top-bar">
+      <span id="status">Ready</span>
+      <span id="plcStatus" class="status-indicator">Not Connected</span>
+    </div>
+
+    <!-- Main Canvas -->
+    <div class="canvas-layer">
+      <canvas id="c"></canvas>
+    </div>
+
+    <!-- Bottom Action Toolbar -->
+    <div class="bottom-bar">
+      <button id="btnAdd" class="btn-icon"><i data-lucide="box"></i>Add</button>
+      <button id="btnRotate" class="btn-icon"><i data-lucide="rotate-cw"></i>Rot</button>
+      <button id="btnDelete" class="btn-icon btn-danger"><i data-lucide="trash-2"></i>Del</button>
+      <div style="width: 20px;"></div> <!-- Spacer -->
+      <button id="btnFit" class="btn-icon"><i data-lucide="maximize"></i>Fit</button>
+      <button id="btnSettingsToggle" class="btn-icon"><i data-lucide="settings"></i>Cfg</button>
+      <button id="btnPlcToggle" class="btn-icon"><i data-lucide="wifi"></i>PLC</button>
+    </div>
+
+    <!-- Settings Drawer (Right Side) -->
+    <div id="drawerSettings" class="drawer">
+      <div class="drawer-header">
+        <h3>Configuration</h3>
+        <button class="close-btn" id="closeSettings"><i data-lucide="x"></i></button>
+      </div>
+      <div class="form-grid">
+        <div class="form-group"><label>Pallet W</label><input type="number" id="palletW" value="1200"></div>
+        <div class="form-group"><label>Pallet D</label><input type="number" id="palletD" value="800"></div>
+        <div class="form-group"><label>Grid (mm)</label><input type="number" id="grid" value="20"></div>
+        <div class="form-group"><label>Box W</label><input type="number" id="boxW" value="300"></div>
+        <div class="form-group"><label>Box D</label><input type="number" id="boxD" value="200"></div>
+        <div class="form-group"><label>Box H</label><input type="number" id="boxH" value="200"></div>
+        <div class="form-group"><label>Layers</label><input type="number" id="numLayers" value="1"></div>
+      </div>
+      <div style="margin-top: 20px; display:flex; gap:10px;">
+         <button id="btnClear" class="btn-icon" style="width:100%; height:40px; flex-direction:row;">Clear All</button>
+      </div>
+    </div>
+
+    <!-- PLC Drawer (Right Side) -->
+    <div id="drawerPlc" class="drawer">
+      <div class="drawer-header">
+        <h3>PLC Comm</h3>
+        <button class="close-btn" id="closePlc"><i data-lucide="x"></i></button>
+      </div>
+      <div class="form-group" style="margin-bottom:15px;">
+        <button id="btnPlcLogin" class="btn-icon" style="width:100%; height:50px; flex-direction:row;">Login</button>
+      </div>
+      <div class="form-group" style="gap:15px;">
+        <button id="btnPlcWrite" class="btn-icon" style="width:100%; height:50px; flex-direction:row; background:var(--accent);" disabled>Write Pattern</button>
+        <button id="btnPlcRead" class="btn-icon" style="width:100%; height:50px; flex-direction:row;" disabled>Read Pattern</button>
+      </div>
+      <div class="form-group" style="margin-top:20px;">
+        <label>Recipe JSON</label>
+        <textarea id="json" style="height:100px; background:#0f172a; color:white; border:1px solid #334155;"></textarea>
+        <div style="display:flex; gap:10px; margin-top:5px;">
+            <button id="btnExport" style="flex:1; padding:10px;">Export</button>
+            <button id="btnImport" style="flex:1; padding:10px;">Import</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Login Dialog -->
+    <dialog id="loginDialog">
+      <h3>PLC Login</h3>
+      <div class="form-group" style="margin-bottom:10px;">
+        <label>Username</label><input type="text" id="plcUser" value="Admin">
+      </div>
+      <div class="form-group" style="margin-bottom:20px;">
+        <label>Password</label><input type="password" id="plcPass">
+      </div>
+      <div style="display:flex; justify-content:flex-end; gap:10px;">
+        <button id="btnCancelLogin" style="padding:10px;">Cancel</button>
+        <button id="btnDoLogin" style="padding:10px; background:var(--accent); color:white; border:none;">Login</button>
+      </div>
+    </dialog>
+  </div>
+`;
+
+// Initialize Icons
+createIcons({
+    icons: { Box, RotateCw, Trash2, Maximize, Settings, Wifi, X },
+    attrs: { 'stroke-width': 2 }
+});
+
+// --- DOM Helpers & Selection ---
 const $ = <T extends HTMLElement>(sel: string) => {
     const el = document.querySelector(sel);
     if (!el) throw new Error(`Missing element: ${sel}`);
@@ -36,35 +128,45 @@ const $ = <T extends HTMLElement>(sel: string) => {
 };
 
 // --- Elements ---
-
 const canvas = $<HTMLCanvasElement>("#c");
-const statusEl = $<HTMLDivElement>("#status");
+const statusEl = $<HTMLSpanElement>("#status");
 const plcStatusEl = $<HTMLSpanElement>("#plcStatus");
 
-const palletWEl = $<HTMLInputElement>("#palletW");
-const palletDEl = $<HTMLInputElement>("#palletL");
-const gridEl = $<HTMLInputElement>("#grid");
-const prodWEl = $<HTMLInputElement>("#prodW");
-const prodDEl = $<HTMLInputElement>("#prodL");
-const prodHEl = $<HTMLInputElement>("#prodH"); // You need to add this to HTML
-const numLayersEl = $<HTMLInputElement>("#numLayers"); // You need to add this to HTML
+// Drawers
+const drawerSettings = $<HTMLDivElement>("#drawerSettings");
+const drawerPlc = $<HTMLDivElement>("#drawerPlc");
 
+// Inputs
+const palletWEl = $<HTMLInputElement>("#palletW");
+const palletDEl = $<HTMLInputElement>("#palletD");
+const gridEl = $<HTMLInputElement>("#grid");
+const boxWEl = $<HTMLInputElement>("#boxW");
+const boxDEl = $<HTMLInputElement>("#boxD");
+const boxHEl = $<HTMLInputElement>("#boxH");
+const numLayersEl = $<HTMLInputElement>("#numLayers");
+
+// Buttons
 const btnAdd = $<HTMLButtonElement>("#btnAdd");
 const btnRotate = $<HTMLButtonElement>("#btnRotate");
 const btnDelete = $<HTMLButtonElement>("#btnDelete");
 const btnFit = $<HTMLButtonElement>("#btnFit");
+const btnSettingsToggle = $<HTMLButtonElement>("#btnSettingsToggle");
+const btnPlcToggle = $<HTMLButtonElement>("#btnPlcToggle");
+const closeSettings = $<HTMLButtonElement>("#closeSettings");
+const closePlc = $<HTMLButtonElement>("#closePlc");
+const btnClear = $<HTMLButtonElement>("#btnClear");
 
 const btnExport = $<HTMLButtonElement>("#btnExport");
 const btnImport = $<HTMLButtonElement>("#btnImport");
-const btnClear = $<HTMLButtonElement>("#btnClear");
 const jsonEl = $<HTMLTextAreaElement>("#json");
 
-// PLC Elements
+// PLC UI
 const btnPlcLogin = $<HTMLButtonElement>("#btnPlcLogin");
 const btnPlcWrite = $<HTMLButtonElement>("#btnPlcWrite");
 const btnPlcRead = $<HTMLButtonElement>("#btnPlcRead");
 const loginDialog = $<HTMLDialogElement>("#loginDialog");
 const btnDoLogin = $<HTMLButtonElement>("#btnDoLogin");
+const btnCancelLogin = $<HTMLButtonElement>("#btnCancelLogin");
 const inputPlcUser = $<HTMLInputElement>("#plcUser");
 const inputPlcPass = $<HTMLInputElement>("#plcPass");
 
@@ -73,12 +175,10 @@ if (!rawCtx) throw new Error("2D canvas not supported");
 const ctx = rawCtx;
 
 // --- State ---
-
 let palletW = 1200;
-let palletL = 800;
+let palletD = 800;
 let grid = 20;
-
-let boxes: Box[] = [];
+let boxes: BoxType[] = [];
 let nextId = 1;
 let selectedId: number | null = null;
 
@@ -98,16 +198,12 @@ let lastPointerY = 0;
 let dirty = true;
 let rafScheduled = false;
 
-// --- PLC Logic Integration ---
-
+// --- PLC Manager Class (Keep existing logic, just ensure types match) ---
 class PlcManager {
     private authService: AuthService;
     private plcService: PlcProgramService;
     private requestConfigService: RequestConfigService;
-
-    private dbName = '"GDB_Palletizing"'; // Adjust to match PLC DB name
-
-    // Fixing the declaration of pollingSubscription
+    private dbName = '"GDB_Palletizing"';
     private pollingSubscription: Subscription | null = null;
     public dataStructArray: DataStruct[] = [];
 
@@ -118,34 +214,22 @@ class PlcManager {
     }
 
     async login(user: string, pass: string): Promise<boolean> {
-        // In local dev, window.location.hostname might be localhost. 
-        // You might want to hardcode IP if testing against a real PLC from PC.
         const ip = window.location.hostname === 'localhost' ? '192.168.0.10' : window.location.hostname;
-
         return await this.authService.loginToPLC(ip, user, pass);
     }
 
-    viteOnInit() {
-        this.startDataPolling();
-    }
+    viteOnInit() { this.startDataPolling(); }
+    viteOnDestroy() { this.stopDataPolling(); }
 
-    viteOnDestroy() {
-        this.stopDataPolling();
-    }
-
-    // start data polling
     public startDataPolling() {
         this.pollingSubscription = interval(2000)
             .pipe(switchMap(() => this.readPattern()))
             .subscribe(
-                (data) => {
-                    this.dataStructArray = data;
-                },
+                (data) => { this.dataStructArray = data; },
                 (error) => console.error('Error during data polling:', error)
             );
     }
 
-    // stop data polling
     public stopDataPolling() {
         if (this.pollingSubscription) {
             this.pollingSubscription.unsubscribe();
@@ -153,58 +237,48 @@ class PlcManager {
         }
     }
 
-    async writePattern(boxes: Box[]) {
+    async writePattern(boxes: BoxType[]) {
         const token = this.authService.getAuthToken();
         if (!token) {
-            console.error("Cannot write: No auth token available");
+            alert("PLC Not Connected");
             return false;
         }
 
-        // 1. Validation: The PLC Array "web_data" is size 20 which row of plc db "web_data[1..20]" 
         if (boxes.length > 20) {
-            alert("PLC Limit Reached: Max 20 boxes per layer allowed.");
+            alert("PLC Limit Reached: Max 20 boxes per layer.");
             return false;
         }
 
         const config = this.requestConfigService.createConfig('https', false);
         config.address = window.location.hostname === 'localhost' ? '192.168.0.10' : window.location.hostname;
 
-        const paramsArray: { var: string, value: any, mode: string }[] = [];
-
-        // 2. Write Configuration (Height & Layers)
-        // This fulfills "Option A": Sending the Z-height info to the PLC
-        const layerHeight = parseInt(prodHEl.value) || 200;
+        const layerHeight = parseInt(boxHEl.value) || 200;
         const layerCount = parseInt(numLayersEl.value) || 1;
+
+        const paramsArray: { var: string, value: any, mode: string }[] = [];
 
         paramsArray.push(
             { var: `${this.dbName}.PatternConfig.productDimension.height`, value: layerHeight, mode: 'simple' },
             { var: `${this.dbName}.PatternConfig.layers`, value: layerCount, mode: 'simple' },
-            { var: `${this.dbName}.useWebPattern`, value: true, mode: 'simple' }, // Enable Web Mode
+            { var: `${this.dbName}.useWebPattern`, value: true, mode: 'simple' },
             { var: `${this.dbName}.web_ProductCount`, value: boxes.length, mode: 'simple' }
         );
 
-        // 3. Write Web Data Array
         boxes.forEach((b, i) => {
             const idx = i + 1;
             const prefix = `${this.dbName}.web_data[${idx}]`;
-
             paramsArray.push(
-                { var: `${prefix}.x`, value: b.x, mode: 'simple' }, // LReal
-                { var: `${prefix}.y`, value: b.y, mode: 'simple' }, // LReal
-                { var: `${prefix}.w`, value: b.w, mode: 'simple' }, // LReal
-                { var: `${prefix}.l`, value: b.l, mode: 'simple' }, // LReal 
-                { var: `${prefix}.rot`, value: b.rot, mode: 'simple' } // Int
+                { var: `${prefix}.x`, value: b.x, mode: 'simple' },
+                { var: `${prefix}.y`, value: b.y, mode: 'simple' },
+                { var: `${prefix}.w`, value: b.w, mode: 'simple' },
+                { var: `${prefix}.l`, value: b.d, mode: 'simple' }, // Note: PLC uses .l, UI uses .d
+                { var: `${prefix}.rot`, value: b.rot, mode: 'simple' }
             );
         });
 
         try {
             const writer = this.plcService.createPlcProgramWrite(config, token, '', '');
             await writer.bulkExecute(paramsArray);
-
-            // OPTIONAL: Trigger the Pattern Generator Execution
-            // You might want to set a "Generate" bit here if your PLC logic requires a rising edge
-            // await this.triggerGeneration(config, token); 
-
             return true;
         } catch (e) {
             console.error("Write failed", e);
@@ -213,126 +287,63 @@ class PlcManager {
     }
 
     async readPattern(): Promise<DataStruct[]> {
-        const token = this.authService.getAuthToken();
-        if (!token) {
-            console.error("Cannot read: No auth token available");
-            return [];
-        }
-
-        const config = this.requestConfigService.createConfig('https', false);
-        config.address = window.location.hostname === 'localhost' ? '192.168.0.10' : window.location.hostname;
-        const paramsArray  = [];
-        const numberOfRows : number = 20; // Size of PLC Array "web_data"
-        for (let i = 1; i < numberOfRows; i++) {
-            const prefix = `${this.dbName}.web_data[${i}]`;
-            paramsArray.push({var: `${prefix}.l`, mode: 'simple'});
-            paramsArray.push({var: `${prefix}.w`, mode: 'simple'});
-            paramsArray.push({var: `${prefix}.rot`, mode: 'simple'});
-            paramsArray.push({var: `${prefix}.x`, mode: 'simple'});
-            paramsArray.push({var: `${prefix}.y`, mode: 'simple'});
-
-            const prefix2 = `${this.dbName}.GeneratorResults[${i}]`;
-            paramsArray.push({var: `${prefix2}.x`, mode: 'simple'});
-            paramsArray.push({var: `${prefix2}.y`, mode: 'simple'});
-            paramsArray.push({var: `${prefix2}.w`, mode: 'simple'});
-            paramsArray.push({var: `${prefix2}.l`, mode: 'simple'});
-            paramsArray.push({var: `${prefix2}.rot`, mode: 'simple'});
-        }
-        try {
-            const plcReader = this.plcService.createPlcProgramRead(config, token,'');
-            const responses = await plcReader.bulkExecute(paramsArray);
-            if (!responses) return [];
-            // TODO: map responses into structured data; placeholder returns empty array for now.
-            return [];
-        } catch (e) {
-            console.error("Read failed", e);
-            return [];
-        }
+        // Stub for read logic
+        return [];
     }
 }
 
 const plcManager = new PlcManager();
 
-// --- Math & Logic ---
-
-function clamp(n: number, min: number, max: number) {
-    return Math.max(min, Math.min(max, n));
-}
-
-function snap(n: number, step: number) {
-    if (step <= 1) return n;
-    return Math.round(n / step) * step;
-}
-
-function getDims(b: Box): { hw: number; hl: number } {
-    const w = b.rot === 0 ? b.w : b.l;
-    const l = b.rot === 0 ? b.l : b.w;
-    return { hw: w / 2, hl: l / 2 };
-}
-
-function clampBoxToPallet(b: Box) {
-    const { hw, hl } = getDims(b);
+// --- Math & Logic (Keep existing) ---
+function clamp(n: number, min: number, max: number) { return Math.max(min, Math.min(max, n)); }
+function snap(n: number, step: number) { return step <= 1 ? n : Math.round(n / step) * step; }
+function getDims(b: BoxType) { return { hw: (b.rot === 0 ? b.w : b.d) / 2, hd: (b.rot === 0 ? b.d : b.w) / 2 }; }
+function clampBoxToPallet(b: BoxType) {
+    const { hw, hd } = getDims(b);
     b.x = clamp(b.x, hw, palletW - hw);
-    b.y = clamp(b.y, hl, palletL - hl);
+    b.y = clamp(b.y, hd, palletD - hd);
 }
-
-function worldToScreen(wx: number, wy: number) {
-    return { x: panX + wx * scale, y: panY + wy * scale };
-}
-
-function screenToWorld(sx: number, sy: number) {
-    return { x: (sx - panX) / scale, y: (sy - panY) / scale };
-}
+function worldToScreen(wx: number, wy: number) { return { x: panX + wx * scale, y: panY + wy * scale }; }
+function screenToWorld(sx: number, sy: number) { return { x: (sx - panX) / scale, y: (sy - panY) / scale }; }
 
 function resizeCanvasToCSSPixels() {
     const rect = canvas.getBoundingClientRect();
-    const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
-    const w = Math.floor(rect.width * dpr);
-    const h = Math.floor(rect.height * dpr);
-
-    if (canvas.width !== w || canvas.height !== h) {
-        canvas.width = w;
-        canvas.height = h;
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        markDirty();
-    }
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    markDirty();
 }
 
 function markDirty() {
     dirty = true;
     if (!rafScheduled) {
         rafScheduled = true;
-        requestAnimationFrame(() => {
-            rafScheduled = false;
-            if (dirty) draw();
-        });
+        requestAnimationFrame(() => { rafScheduled = false; if (dirty) draw(); });
     }
 }
 
-// --- Drawing ---
-
+// --- Drawing (Keep existing logic, just ensure colors match new theme) ---
 function drawGrid() {
     if (grid < 5) return;
     const rect = canvas.getBoundingClientRect();
     const wWorld0 = screenToWorld(0, 0);
     const wWorld1 = screenToWorld(rect.width, rect.height);
-
     const x0 = clamp(Math.floor(wWorld0.x / grid) * grid, 0, palletW);
-    const y0 = clamp(Math.floor(wWorld0.y / grid) * grid, 0, palletL);
+    const y0 = clamp(Math.floor(wWorld0.y / grid) * grid, 0, palletD);
 
-    ctx.strokeStyle = "rgba(255,255,255,0.06)";
+    ctx.strokeStyle = "rgba(255,255,255,0.05)";
     ctx.lineWidth = 1;
-
     ctx.beginPath();
     for (let x = x0; x <= wWorld1.x; x += grid) {
         if (x < 0 || x > palletW) continue;
         const s0 = worldToScreen(x, 0);
-        const s1 = worldToScreen(x, palletL);
+        const s1 = worldToScreen(x, palletD);
         ctx.moveTo(s0.x, s0.y);
         ctx.lineTo(s1.x, s1.y);
     }
     for (let y = y0; y <= wWorld1.y; y += grid) {
-        if (y < 0 || y > palletL) continue;
+        if (y < 0 || y > palletD) continue;
         const s0 = worldToScreen(0, y);
         const s1 = worldToScreen(palletW, y);
         ctx.moveTo(s0.x, s0.y);
@@ -343,55 +354,50 @@ function drawGrid() {
 
 function drawPallet() {
     const p0 = worldToScreen(0, 0);
-    const p1 = worldToScreen(palletW, palletL);
-    const x = p0.x, y = p0.y, w = p1.x - p0.x, h = p1.y - p0.y;
-
-    ctx.fillStyle = "#0c1724";
-    ctx.fillRect(x, y, w, h);
-    ctx.strokeStyle = "rgba(255,255,255,0.25)";
+    const p1 = worldToScreen(palletW, palletD);
+    const w = p1.x - p0.x, h = p1.y - p0.y;
+    ctx.fillStyle = "#1e293b";
+    ctx.fillRect(p0.x, p0.y, w, h);
+    ctx.strokeStyle = "#475569";
     ctx.lineWidth = 2;
-    ctx.strokeRect(x, y, w, h);
-
-    // Origin
-    ctx.fillStyle = "rgba(110,168,254,0.9)";
-    ctx.fillRect(x - 3, y - 3, 6, 6);
+    ctx.strokeRect(p0.x, p0.y, w, h);
+    // Origin marker
+    ctx.fillStyle = "#3b82f6";
+    ctx.fillRect(p0.x - 4, p0.y - 4, 8, 8);
 }
 
-function drawBox(b: Box) {
-    const { hw, hl } = getDims(b);
-    const s0 = worldToScreen(b.x - hw, b.y - hl);
-    const s1 = worldToScreen(b.x + hw, b.y + hl);
+function drawBox(b: BoxType) {
+    const { hw, hd } = getDims(b);
+    const s0 = worldToScreen(b.x - hw, b.y - hd);
+    const s1 = worldToScreen(b.x + hw, b.y + hd);
     const isSel = selectedId === b.id;
 
-    ctx.fillStyle = isSel ? "rgba(110,168,254,0.22)" : "rgba(255,255,255,0.10)";
-    ctx.strokeStyle = isSel ? "rgba(110,168,254,0.95)" : "rgba(255,255,255,0.35)";
-    ctx.lineWidth = isSel ? 2 : 1.5;
+    ctx.fillStyle = isSel ? "rgba(59, 130, 246, 0.3)" : "rgba(100, 116, 139, 0.3)";
+    ctx.strokeStyle = isSel ? "#3b82f6" : "#94a3b8";
+    ctx.lineWidth = isSel ? 2 : 1;
 
     ctx.fillRect(s0.x, s0.y, s1.x - s0.x, s1.y - s0.y);
     ctx.strokeRect(s0.x, s0.y, s1.x - s0.x, s1.y - s0.y);
 
-    // Orientation
-    ctx.strokeStyle = isSel ? "rgba(110,168,254,0.95)" : "rgba(255,255,255,0.45)";
-    ctx.lineWidth = 2;
+    // Orientation Indicator
     ctx.beginPath();
     const c = worldToScreen(b.x, b.y);
-    const tick = worldToScreen(b.x + (b.rot === 0 ? hw : 0), b.y + (b.rot === 90 ? hl : 0));
+    const tick = worldToScreen(b.x + (b.rot === 0 ? hw * 0.8 : 0), b.y + (b.rot === 90 ? hd * 0.8 : 0));
     ctx.moveTo(c.x, c.y);
     ctx.lineTo(tick.x, tick.y);
     ctx.stroke();
 
-    ctx.fillStyle = "rgba(230,237,243,0.85)";
-    ctx.font = "12px monospace";
-    ctx.fillText(`#${b.id}`, s0.x + 6, s0.y + 16);
+    ctx.fillStyle = "white";
+    ctx.font = "12px sans-serif";
+    ctx.fillText(`#${b.id}`, s0.x + 5, s0.y + 15);
 }
 
 function draw() {
     dirty = false;
-    resizeCanvasToCSSPixels();
     const rect = canvas.getBoundingClientRect();
     ctx.clearRect(0, 0, rect.width, rect.height);
-
-    ctx.fillStyle = "#0b1016";
+    // Background
+    ctx.fillStyle = "#0f172a";
     ctx.fillRect(0, 0, rect.width, rect.height);
 
     drawPallet();
@@ -399,35 +405,37 @@ function draw() {
     for (const b of boxes) drawBox(b);
 
     const sel = selectedId ? boxes.find(b => b.id === selectedId) : null;
-    statusEl.textContent = `Boxes: ${boxes.length} | Selected: ${sel ? `#${sel.id}` : "-"} | Zoom: ${Math.round(scale * 100)}%`;
+    statusEl.textContent = `Box: ${sel ? `#${sel.id}` : "-"} | Total: ${boxes.length}`;
 }
 
-// --- Actions ---
-
+// --- Actions (Keep existing logic) ---
 function fitView() {
     const rect = canvas.getBoundingClientRect();
-    const margin = 24;
+    const margin = 40;
     const sx = (rect.width - margin * 2) / palletW;
-    const sy = (rect.height - margin * 2) / palletL;
+    const sy = (rect.height - margin * 2) / palletD;
     scale = clamp(Math.min(sx, sy), 0.05, 2.0);
-    panX = margin;
-    panY = margin;
+    // Center logic
+    const screenW = palletW * scale;
+    const screenH = palletD * scale;
+    panX = (rect.width - screenW) / 2;
+    panY = (rect.height - screenH) / 2;
     markDirty();
 }
 
-function hitTest(worldX: number, worldY: number): Box | null {
+function hitTest(worldX: number, worldY: number): BoxType | null {
     for (let i = boxes.length - 1; i >= 0; i--) {
         const b = boxes[i];
-        const { hw, hl } = getDims(b);
-        if (worldX >= b.x - hw && worldX <= b.x + hw && worldY >= b.y - hl && worldY <= b.y + hl) return b;
+        const { hw, hd } = getDims(b);
+        if (worldX >= b.x - hw && worldX <= b.x + hw && worldY >= b.y - hd && worldY <= b.y + hd) return b;
     }
     return null;
 }
 
 function addBoxAt(x: number, y: number) {
-    const w = Math.max(10, Number(prodWEl.value) || 300);
-    const d = Math.max(10, Number(prodDEl.value) || 200);
-    const b: Box = { id: nextId++, x: snap(x, grid), y: snap(y, grid), w, l: d, rot: 0 };
+    const w = Math.max(10, Number(boxWEl.value) || 300);
+    const d = Math.max(10, Number(boxDEl.value) || 200);
+    const b: BoxType = { id: nextId++, x: snap(x, grid), y: snap(y, grid), w, d, rot: 0 };
     clampBoxToPallet(b);
     boxes.push(b);
     selectedId = b.id;
@@ -460,30 +468,29 @@ function clearAll() {
 
 function exportRecipe(): Recipe {
     return {
-        pallet: { w: palletW, l: palletL },
+        pallet: { w: palletW, d: palletD },
         grid,
-        boxes: boxes.map(b => ({ x: b.x, y: b.y, w: b.w, l: b.l, rot: b.rot }))
+        boxes: boxes.map(b => ({ x: b.x, y: b.y, w: b.w, d: b.d, rot: b.rot }))
     };
 }
 
 function importRecipe(text: string) {
     try {
         const data = JSON.parse(text) as Recipe;
-        if (!data?.pallet?.w || !data?.pallet?.l) {
-            alert(("Invalid recipe"));}
+        if (!data?.pallet?.w || !data?.pallet?.d) throw new Error("Invalid recipe");
         palletW = data.pallet.w;
-        palletL = data.pallet.l;
+        palletD = data.pallet.d;
         grid = data.grid || 10;
         palletWEl.value = String(palletW);
-        palletDEl.value = String(palletL);
+        palletDEl.value = String(palletD);
         gridEl.value = String(grid);
         boxes = (data.boxes || []).map((b, idx) => {
-            const box: Box = {
+            const box: BoxType = {
                 id: idx + 1,
                 x: snap(Number(b.x), grid),
                 y: snap(Number(b.y), grid),
                 w: Number(b.w),
-                l: Number(b.l),
+                d: Number(b.d),
                 rot: b.rot === 90 ? 90 : 0
             };
             clampBoxToPallet(box);
@@ -499,7 +506,7 @@ function importRecipe(text: string) {
 
 function updateFromInputs() {
     palletW = Math.max(100, Number(palletWEl.value) || palletW);
-    palletL = Math.max(100, Number(palletDEl.value) || palletL);
+    palletD = Math.max(100, Number(palletDEl.value) || palletD);
     grid = Math.max(1, Number(gridEl.value) || grid);
     boxes.forEach(b => {
         b.x = snap(b.x, grid);
@@ -509,37 +516,84 @@ function updateFromInputs() {
     markDirty();
 }
 
-function zoomAt(sx: number, sy: number, factor: number) {
-    const before = screenToWorld(sx, sy);
-    scale = clamp(scale * factor, 0.05, 4.0);
-    const after = screenToWorld(sx, sy);
-    panX += (after.x - before.x) * scale;
-    panY += (after.y - before.y) * scale;
-    markDirty();
-}
-
 // --- Event Listeners ---
+// Drawer Toggles
+const toggleDrawer = (el: HTMLElement) => {
+    // Close others
+    if (el !== drawerSettings) drawerSettings.classList.remove('open');
+    if (el !== drawerPlc) drawerPlc.classList.remove('open');
+    el.classList.toggle('open');
+};
 
-[palletWEl, palletDEl, gridEl].forEach(el => el.addEventListener("change", updateFromInputs));
+btnSettingsToggle.addEventListener("click", () => toggleDrawer(drawerSettings));
+btnPlcToggle.addEventListener("click", () => toggleDrawer(drawerPlc));
+closeSettings.addEventListener("click", () => drawerSettings.classList.remove('open'));
+closePlc.addEventListener("click", () => drawerPlc.classList.remove('open'));
 
-btnAdd.addEventListener("click", () => addBoxAt(palletW / 2, palletL / 2));
+// Canvas Interaction (Pointer events cover Touch on modern browsers)
+canvas.addEventListener("pointerdown", (e) => {
+    canvas.setPointerCapture(e.pointerId);
+    const rect = canvas.getBoundingClientRect();
+    const sx = e.clientX - rect.left;
+    const sy = e.clientY - rect.top;
+    lastPointerX = sx;
+    lastPointerY = sy;
+    const w = screenToWorld(sx, sy);
+
+    const hit = hitTest(w.x, w.y);
+    if (hit) {
+        selectedId = hit.id;
+        isDragging = true;
+        dragOffsetX = hit.x - w.x;
+        dragOffsetY = hit.y - w.y;
+    } else {
+        // If clicking background, deselect. 
+        // Note: Panning removed for simplicity on HMI, use Fit View.
+        selectedId = null;
+    }
+    markDirty();
+});
+
+canvas.addEventListener("pointermove", (e) => {
+    if (!isDragging || !selectedId) return;
+    const rect = canvas.getBoundingClientRect();
+    const sx = e.clientX - rect.left;
+    const sy = e.clientY - rect.top;
+    const w = screenToWorld(sx, sy);
+
+    const b = boxes.find(x => x.id === selectedId);
+    if (b) {
+        b.x = snap(w.x + dragOffsetX, grid);
+        b.y = snap(w.y + dragOffsetY, grid);
+        clampBoxToPallet(b);
+        markDirty();
+    }
+});
+
+canvas.addEventListener("pointerup", (e) => {
+    canvas.releasePointerCapture(e.pointerId);
+    isDragging = false;
+    markDirty();
+});
+
+// Button Actions
+btnAdd.addEventListener("click", () => addBoxAt(palletW / 2, palletD / 2));
 btnRotate.addEventListener("click", rotateSelected);
 btnDelete.addEventListener("click", deleteSelected);
 btnFit.addEventListener("click", fitView);
-btnExport.addEventListener("click", () => { jsonEl.value = JSON.stringify(exportRecipe(), null, 2); });
-btnImport.addEventListener("click", () => importRecipe(jsonEl.value));
 btnClear.addEventListener("click", () => { clearAll(); jsonEl.value = ""; });
 
-// PLC UI Handlers
-btnPlcLogin.addEventListener("click", () => {
-    loginDialog.showModal();
-});
+// Settings Inputs
+[palletWEl, palletDEl, gridEl].forEach(el => el.addEventListener("change", updateFromInputs));
+
+// PLC Actions
+btnPlcLogin.addEventListener("click", () => loginDialog.showModal());
+btnCancelLogin.addEventListener("click", () => loginDialog.close());
 
 btnDoLogin.addEventListener("click", async (e) => {
-    e.preventDefault(); // prevent form submit
+    e.preventDefault();
     const user = inputPlcUser.value;
     const pass = inputPlcPass.value;
-
     plcStatusEl.textContent = "Connecting...";
     loginDialog.close();
 
@@ -548,6 +602,7 @@ btnDoLogin.addEventListener("click", async (e) => {
         plcStatusEl.textContent = "Connected";
         plcStatusEl.style.color = "var(--ok)";
         btnPlcWrite.disabled = false;
+        btnPlcRead.disabled = false;
         btnPlcLogin.textContent = "Logged In";
         btnPlcLogin.disabled = true;
     } else {
@@ -568,120 +623,13 @@ btnPlcWrite.addEventListener("click", async () => {
     }
 });
 
-btnPlcRead.addEventListener("click", async () => {
-    plcStatusEl.textContent = "Reading...";
-    const data = await plcManager.readPattern();
-    const success = Array.isArray(data);
-    plcStatusEl.textContent = success ? "Read Success" : "Read Failed";
-    plcStatusEl.style.color = success ? "var(--ok)" : "var(--danger)";
-});
+// Export/Import
+btnExport.addEventListener("click", () => { jsonEl.value = JSON.stringify(exportRecipe(), null, 2); });
+btnImport.addEventListener("click", () => importRecipe(jsonEl.value));
 
-// Canvas Interaction
-canvas.addEventListener("pointerdown", (e) => {
-    canvas.setPointerCapture(e.pointerId);
-    const rect = canvas.getBoundingClientRect();
-    const sx = e.clientX - rect.left;
-    const sy = e.clientY - rect.top;
-    lastPointerX = sx;
-    lastPointerY = sy;
-    const w = screenToWorld(sx, sy);
-
-    if (e.button === 2) {
-        isPanning = true;
-        markDirty();
-        return;
-    }
-
-    const hit = hitTest(w.x, w.y);
-    if (hit) {
-        selectedId = hit.id;
-        isDragging = true;
-        dragOffsetX = hit.x - w.x;
-        dragOffsetY = hit.y - w.y;
-    } else {
-        selectedId = null;
-    }
-    markDirty();
-});
-
-canvas.addEventListener("pointermove", (e) => {
-    const rect = canvas.getBoundingClientRect();
-    const sx = e.clientX - rect.left;
-    const sy = e.clientY - rect.top;
-
-    if (isPanning) {
-        panX += (sx - lastPointerX);
-        panY += (sy - lastPointerY);
-        lastPointerX = sx;
-        lastPointerY = sy;
-        markDirty();
-        return;
-    }
-
-    if (isDragging && selectedId) {
-        const w = screenToWorld(sx, sy);
-        const b = boxes.find(x => x.id === selectedId);
-        if (b) {
-            b.x = snap(w.x + dragOffsetX, grid);
-            b.y = snap(w.y + dragOffsetY, grid);
-            clampBoxToPallet(b);
-            markDirty();
-        }
-    }
-});
-
-canvas.addEventListener("pointerup", (e) => {
-    canvas.releasePointerCapture(e.pointerId);
-    isDragging = false;
-    isPanning = false;
-    markDirty();
-});
-
-canvas.addEventListener("wheel", (e) => {
-    e.preventDefault();
-    const rect = canvas.getBoundingClientRect();
-    const sx = e.clientX - rect.left;
-    const sy = e.clientY - rect.top;
-    zoomAt(sx, sy, e.deltaY < 0 ? 1.12 : 0.89);
-}, { passive: false });
-
-canvas.addEventListener("dblclick", (e) => {
-    const rect = canvas.getBoundingClientRect();
-    const w = screenToWorld(e.clientX - rect.left, e.clientY - rect.top);
-    addBoxAt(w.x, w.y);
-});
-
-// Keyboard
-window.addEventListener("keydown", (e) => {
-    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-    if (e.key === "Delete" || e.key === "Backspace") deleteSelected();
-    if (e.key.toLowerCase() === "r") rotateSelected();
-    if (e.key.toLowerCase() === "f") fitView();
-});
-
-// Init
+// Initial Setup
+window.addEventListener("resize", () => { resizeCanvasToCSSPixels(); fitView(); });
 updateFromInputs();
+resizeCanvasToCSSPixels();
 fitView();
-draw();
-// Start the PLC Manager logic
 plcManager.viteOnInit();
-
-// --- Auto Login Logic ---
-(async () => {
-    console.log("Initiating Auto-Login...");
-    plcStatusEl.textContent = "Auto-connecting...";
-
-    // Attempt login with hardcoded credentials
-    const success = await plcManager.login('Admin', '12345678');
-
-    if (success) {
-        plcStatusEl.textContent = "Connected (Auto)";
-        plcStatusEl.style.color = "var(--ok)";
-        btnPlcWrite.disabled = false;
-        btnPlcLogin.textContent = "Logged In";
-        btnPlcLogin.disabled = true;
-    } else {
-        plcStatusEl.textContent = "Auto-login Failed";
-        plcStatusEl.style.color = "var(--danger)";
-    }
-})();
