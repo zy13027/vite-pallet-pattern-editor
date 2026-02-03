@@ -21,20 +21,20 @@ type BoxType = {
     x: number;
     y: number;
     w: number;
-    d: number;
+    l: number;
     rot: Rot;
 };
 
 type Recipe = {
-    pallet: { w: number; d: number };
+    pallet: { w: number; l: number };
     grid: number;
-    boxes: Array<{ x: number; y: number; w: number; d: number; rot: Rot }>;
+    boxes: Array<{ x: number; y: number; w: number; l: number; rot: Rot }>;
 };
 
 interface DataStruct {
-    pallet: { w: number; d: number };
+    pallet: { w: number; l: number };
     grid: number;
-    boxes: Array<{ x: number; y: number; w: number; d: number; rot: Rot }>;
+    boxes: Array<{ x: number; y: number; w: number; l: number; rot: Rot }>;
 }
 
 // --- 1. INJECT OPTIMIZED HTML STRUCTURE ---
@@ -72,10 +72,10 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
       </div>
       <div class="form-grid">
         <div class="form-group"><label>Pallet W</label><input type="number" id="palletW" value="1200"></div>
-        <div class="form-group"><label>Pallet D</label><input type="number" id="palletD" value="800"></div>
+        <div class="form-group"><label>Pallet L</label><input type="number" id="palletL" value="800"></div>
         <div class="form-group"><label>Grid (mm)</label><input type="number" id="grid" value="20"></div>
         <div class="form-group"><label>Box W</label><input type="number" id="boxW" value="300"></div>
-        <div class="form-group"><label>Box D</label><input type="number" id="boxD" value="200"></div>
+        <div class="form-group"><label>Box L</label><input type="number" id="boxL" value="200"></div>
         <div class="form-group"><label>Box H</label><input type="number" id="boxH" value="200"></div>
         <div class="form-group"><label>Layers</label><input type="number" id="numLayers" value="1"></div>
       </div>
@@ -278,7 +278,7 @@ class PlcManager {
                 { var: `${prefix}.x`, value: b.x, mode: 'simple' },
                 { var: `${prefix}.y`, value: b.y, mode: 'simple' },
                 { var: `${prefix}.w`, value: b.w, mode: 'simple' },
-                { var: `${prefix}.l`, value: b.d, mode: 'simple' },
+                { var: `${prefix}.l`, value: b.l, mode: 'simple' },
                 { var: `${prefix}.rot`, value: b.rot, mode: 'simple' }
             );
         });
@@ -303,7 +303,7 @@ const plcManager = new PlcManager();
 // --- Math & Logic ---
 function clamp(n: number, min: number, max: number) { return Math.max(min, Math.min(max, n)); }
 function snap(n: number, step: number) { return step <= 1 ? n : Math.round(n / step) * step; }
-function getDims(b: BoxType) { return { hw: (b.rot === 0 ? b.w : b.d) / 2, hd: (b.rot === 0 ? b.d : b.w) / 2 }; }
+function getDims(b: BoxType) { return { hw: (b.rot === 0 ? b.w : b.l) / 2, hd: (b.rot === 0 ? b.l : b.w) / 2 }; }
 function clampBoxToPallet(b: BoxType) {
     const { hw, hd } = getDims(b);
     b.x = clamp(b.x, hw, palletW - hw);
@@ -445,8 +445,8 @@ function hitTest(worldX: number, worldY: number): BoxType | null {
 
 function addBoxAt(x: number, y: number) {
     const w = Math.max(10, Number(boxWEl.value) || 300);
-    const d = Math.max(10, Number(boxDEl.value) || 200);
-    const b: BoxType = { id: nextId++, x: snap(x, grid), y: snap(y, grid), w, d, rot: 0 };
+    const l = Math.max(10, Number(boxDEl.value) || 200);
+    const b: BoxType = { id: nextId++, x: snap(x, grid), y: snap(y, grid), w, l: l, rot: 0 };
     clampBoxToPallet(b);
     boxes.push(b);
     selectedId = b.id;
@@ -479,18 +479,18 @@ function clearAll() {
 
 function exportRecipe(): Recipe {
     return {
-        pallet: { w: palletW, d: palletD },
+        pallet: { w: palletW, l: palletD },
         grid,
-        boxes: boxes.map(b => ({ x: b.x, y: b.y, w: b.w, d: b.d, rot: b.rot }))
+        boxes: boxes.map(b => ({ x: b.x, y: b.y, w: b.w, l: b.l, rot: b.rot }))
     };
 }
 
 function importRecipe(text: string) {
     try {
         const data = JSON.parse(text) as Recipe;
-        if (!data?.pallet?.w || !data?.pallet?.d) throw new Error("Invalid recipe");
+        if (!data?.pallet?.w || !data?.pallet?.l) throw new Error("Invalid recipe");
         palletW = data.pallet.w;
-        palletD = data.pallet.d;
+        palletD = data.pallet.l;
         grid = data.grid || 10;
         palletWEl.value = String(palletW);
         palletDEl.value = String(palletD);
@@ -501,7 +501,7 @@ function importRecipe(text: string) {
                 x: snap(Number(b.x), grid),
                 y: snap(Number(b.y), grid),
                 w: Number(b.w),
-                d: Number(b.d),
+                l: Number(b.l),
                 rot: b.rot === 90 ? 90 : 0
             };
             clampBoxToPallet(box);

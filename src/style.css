@@ -1,13 +1,14 @@
 :root {
   /* Siemens HMI Light Theme Palette */
-  --bg: #f3f4f6;           /* Light Gray Background */
-  --panel: #ffffff;        /* White Panels */
-  --ink: #333333;          /* Dark Text */
-  --accent: #009999;       /* Siemens Teal */
+  --bg: #f5f7f7;
+  --panel: #ffffff;
+  --ink: #2f2f2f;
+  --accent: #009999;        /* Siemens Teal */
   --accent-active: #007f7f; /* Darker Teal for Active States */
-  --danger: #cc0000;       /* Industrial Red */
-  --ok: #22c55e;  /* Green for OK Status */
-  --border: #cbd5e1;       /* Light Borders */
+  --accent-soft: #e6f3f3;   /* Soft Siemens Teal background */
+  --danger: #cc0000;
+  --ok: #22c55e;
+  --border: #cbd5e1;
   --shadow: rgba(0, 0, 0, 0.1);
 }
 
@@ -94,10 +95,10 @@ canvas {
   z-index: 10;
   display: flex;
   gap: 10px;
-  background: var(--panel);
+  background: var(--accent-soft);
   padding: 8px 15px;
   border-radius: 8px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--accent);
   box-shadow: 0 4px 12px var(--shadow);
 }
 
@@ -120,6 +121,7 @@ canvas {
   transition: all 0.1s;
 }
 .btn-icon:active { background: var(--accent); color: white; border-color: var(--accent); }
+.btn-icon:hover { border-color: var(--accent); box-shadow: 0 0 0 1px rgba(0, 153, 153, 0.15); }
 .btn-icon svg { width: 22px; height: 22px; stroke: var(--ink); }
 .btn-icon:active svg { stroke: white; }
 
